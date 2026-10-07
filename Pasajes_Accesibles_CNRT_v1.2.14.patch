@@ -1,0 +1,1310 @@
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/.github/workflows/release.yml pa_portable_1214/Pasajes_Accesibles_CNRT/.github/workflows/release.yml
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/.github/workflows/release.yml	2026-10-07 19:19:54.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/.github/workflows/release.yml	2026-10-07 22:18:13.263577856 +0000
+@@ -36,7 +36,7 @@
+         run: python -m unittest discover -s tests -q
+ 
+       - name: Compile Python sources
+-        run: python -m compileall -q pasajes_accesibles_cnrt launcher.py tools
++        run: python -m compileall -q pasajes_accesibles_cnrt launcher.py portable_updater.py tools
+ 
+       - name: Inject update repository
+         run: python tools/generate_build_info.py --repository "${{ github.repository }}"
+@@ -58,6 +58,15 @@
+       - name: Build application
+         run: pyinstaller --noconfirm PasajesAccesiblesCNRT.spec
+ 
++      - name: Build portable updater helper
++        shell: pwsh
++        run: |
++          pyinstaller --noconfirm --clean --onefile --name PasajesPortableUpdater `
++            --distpath build\portable-helper `
++            --workpath build\portable-helper-work `
++            --specpath build\portable-helper-spec `
++            portable_updater.py
++
+       - name: Build installer
+         shell: pwsh
+         run: |
+@@ -68,13 +77,34 @@
+           $version = "${{ github.ref_name }}".TrimStart('v')
+           & $iscc "/DAppVersion=$version" "/DBuildRoot=${{ github.workspace }}\dist\Pasajes Accesibles CNRT" "/DBrowserRoot=${{ github.workspace }}\build\ms-playwright" installer\PasajesAccesiblesCNRT.iss
+ 
++      - name: Build portable package
++        shell: pwsh
++        run: |
++          $version = "${{ github.ref_name }}".TrimStart('v')
++          $portableParent = "release\portable"
++          $portableRoot = "$portableParent\Pasajes Accesibles CNRT"
++          Remove-Item $portableParent -Recurse -Force -ErrorAction SilentlyContinue
++          New-Item -ItemType Directory -Force $portableRoot | Out-Null
++          Copy-Item "dist\Pasajes Accesibles CNRT\*" $portableRoot -Recurse -Force
++          Copy-Item "build\ms-playwright" "$portableRoot\ms-playwright" -Recurse -Force
++          Copy-Item "build\portable-helper\PasajesPortableUpdater.exe" "$portableRoot\PasajesPortableUpdater.exe" -Force
++          "channel=portable`nversion=$version" | Set-Content "$portableRoot\.portable" -Encoding ascii
++          python tools\write_portable_manifest.py "$portableRoot" --version $version
++          $zip = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
++          Compress-Archive -Path $portableRoot -DestinationPath $zip -CompressionLevel Optimal -Force
++
+       - name: Write SHA-256
+         shell: pwsh
+         run: |
+           $version = "${{ github.ref_name }}".TrimStart('v')
+-          $file = "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe"
+-          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+-          "$hash  Pasajes_Accesibles_CNRT_Setup_v$version.exe" | Set-Content "$file.sha256" -Encoding ascii
++          $files = @(
++            "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe",
++            "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
++          )
++          foreach ($file in $files) {
++            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
++            "$hash  $(Split-Path $file -Leaf)" | Set-Content "$file.sha256" -Encoding ascii
++          }
+ 
+       - name: Create GitHub Release
+         env:
+@@ -83,5 +113,8 @@
+         run: |
+           $version = "${{ github.ref_name }}".TrimStart('v')
+           $installer = "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe"
+-          $checksum = "$installer.sha256"
+-          gh release create "${{ github.ref_name }}" $installer $checksum --title "Pasajes Accesibles CNRT $version" --generate-notes
++          $portable = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
++          gh release create "${{ github.ref_name }}" `
++            $installer "$installer.sha256" `
++            $portable "$portable.sha256" `
++            --title "Pasajes Accesibles CNRT $version" --generate-notes
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/RDD_REVIEW_v1.2.14.md pa_portable_1214/Pasajes_Accesibles_CNRT/RDD_REVIEW_v1.2.14.md
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/RDD_REVIEW_v1.2.14.md	1970-01-01 00:00:00.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/RDD_REVIEW_v1.2.14.md	2026-10-07 22:19:31.276300450 +0000
+@@ -0,0 +1,52 @@
++# Revisión RDD — Pasajes Accesibles CNRT 1.2.14
++
++Fecha: 2026-10-07
++
++## Candidato congelado
++
++La ampliación incorpora un segundo canal de distribución: `Setup.exe` y `Portable.zip`. Ambos se publican en el mismo GitHub Release con SHA-256. El ejecutable detecta el canal portable por un marcador incluido únicamente en ese paquete.
++
++## Risk
++
++- El repositorio oficial continúa fijado durante GitHub Actions y no puede ser sustituido por una variable de entorno en la compilación oficial.
++- El actualizador exige el nombre exacto del asset correspondiente al canal y una URL HTTPS dentro del release esperado.
++- Antes de aplicar un portable se verifica SHA-256, tamaño, única carpeta raíz, ausencia de `..`, rutas absolutas, barras inversas anómalas, ADS mediante `:`, enlaces simbólicos y archivos duplicados ignorando mayúsculas/minúsculas.
++- El auxiliar solo reemplaza carpetas que contengan el marcador portable.
++- No se modifica `%APPDATA%`, donde permanecen preferencias, credenciales protegidas y seguimiento local.
++
++## Readability
++
++- `updater.py` concentra descubrimiento, descarga, verificación y preparación del canal.
++- `portable_updater.py` es un auxiliar pequeño e independiente dedicado únicamente al cambio de carpeta después de cerrar el proceso principal.
++- `tools/write_portable_manifest.py` genera de forma determinista la lista de archivos administrados por el portable.
++- El workflow nombra por separado las fases de aplicación, auxiliar, instalador, portable, hashes y release.
++
++## Reliability
++
++Pruebas adversariales cubrieron selección correcta de canal, rechazo de assets externos, hash incorrecto, mezcla de canales, ZIP traversal, duplicados insensibles a mayúsculas, reemplazo completo, rollback al fallar el arranque y preservación de archivos agregados por el usuario.
++
++### Hallazgo del candidato congelado
++
++Se reprodujo un problema: el primer diseño reemplazaba toda la carpeta portable y eliminaba cualquier archivo que la persona hubiera agregado manualmente dentro de ella. Era un problema causado por esta ampliación.
++
++### Única corrección RDD aplicada
++
++Se añadió `.portable-manifest.json`. El helper considera administrados únicamente los archivos que figuraban en el manifiesto de la versión anterior; antes de eliminar la copia de respaldo devuelve a la nueva carpeta los archivos no administrados y nunca sobrescribe con ellos archivos del nuevo paquete. Tras esta corrección se añadió una prueba específica de preservación.
++
++## Resilience
++
++- Una descarga incompleta o con SHA incorrecto se descarta sin tocar la aplicación actual.
++- El ZIP se prepara en una carpeta hermana antes de cerrar la aplicación; si no hay permisos o espacio, la versión actual sigue intacta.
++- El auxiliar espera a que termine el proceso, conserva temporalmente la carpeta anterior y revierte si no puede activar o iniciar la nueva.
++- Los bloqueos transitorios de Windows se reintentan durante un período acotado.
++- Si la copia anterior no puede borrarse después de un inicio exitoso, se conserva; eso ocupa espacio pero no invalida la actualización.
++
++## Riesgos residuales documentados
++
++- El instalador y el portable todavía no usan firma Authenticode; SHA-256 verifica integridad respecto del release, pero no sustituye una firma de editor para SmartScreen.
++- El comportamiento real de bloqueo de archivos, antivirus, USB y reinicio del helper debe validarse en Windows con el artefacto construido por GitHub Actions.
++- La carpeta donde vive el portable debe ser escribible para poder actualizarse automáticamente.
++
++## Resultado
++
++Después de la corrección acotada: 79/79 pruebas correctas, `compileall` correcto y auditor wxPython con 0 hallazgos dirigidos. El build Windows final queda a cargo del workflow al publicar el tag.
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/README.md pa_portable_1214/Pasajes_Accesibles_CNRT/README.md
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/README.md	2026-10-07 19:21:06.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/README.md	2026-10-07 22:19:31.276108520 +0000
+@@ -31,11 +31,16 @@
+ 
+ ## Distribución como ejecutable
+ 
+-El repositorio incluye una compilación para Windows basada en PyInstaller e Inno Setup. Al publicar un tag con formato `vX.Y.Z`, el workflow `.github/workflows/release.yml` valida que el tag coincida con `__version__`, ejecuta las pruebas, compila el programa, incluye Chromium de Playwright y publica en GitHub Releases un instalador llamado `Pasajes_Accesibles_CNRT_Setup_vX.Y.Z.exe` junto con su SHA-256.
++El repositorio incluye una compilación para Windows basada en PyInstaller e Inno Setup. Al publicar un tag con formato `vX.Y.Z`, el workflow `.github/workflows/release.yml` valida que el tag coincida con `__version__`, ejecuta las pruebas, compila el programa e incluye Chromium de Playwright. Cada GitHub Release publica dos formatos, ambos con su SHA-256:
+ 
+-La persona usuaria instala ese `.exe` en `%LOCALAPPDATA%\Programs\Pasajes Accesibles CNRT`. Las preferencias, credenciales protegidas y demás datos de usuario permanecen en `%APPDATA%\Pasajes Accesibles CNRT`, por lo que una actualización del programa no los elimina.
++- `Pasajes_Accesibles_CNRT_Setup_vX.Y.Z.exe`: instalador por usuario.
++- `Pasajes_Accesibles_CNRT_Portable_vX.Y.Z.zip`: versión portable autocontenida, que se ejecuta después de descomprimirla y no necesita instalación.
+ 
+-Para construirlo manualmente en Windows, defina `GITHUB_REPOSITORY=usuario/repositorio` y ejecute `build\build_exe.bat`. Se requiere Inno Setup 6 para crear el instalador final.
++La versión instalada se guarda en `%LOCALAPPDATA%\Programs\Pasajes Accesibles CNRT`. La versión portable permanece en la carpeta donde la persona la descomprima. En ambos casos, las preferencias, credenciales protegidas y demás datos de usuario se guardan en `%APPDATA%\Pasajes Accesibles CNRT`, por lo que actualizar o reemplazar la carpeta del programa no los elimina.
++
++El actualizador detecta automáticamente el canal. La versión instalada descarga el siguiente Setup; la versión portable descarga el siguiente ZIP portable, valida SHA-256 y la estructura del paquete, cierra la aplicación y usa un auxiliar independiente para reemplazar la carpeta. El portable incluye un manifiesto de archivos administrados para conservar archivos que la persona haya agregado por su cuenta dentro de esa carpeta.
++
++Se requiere Inno Setup 6 para crear el instalador final; el workflow de GitHub Actions realiza todo el empaquetado automáticamente.
+ 
+ ## Instalación desde el código fuente
+ 
+@@ -306,3 +311,14 @@
+ - Se añadieron PyInstaller, un script de Inno Setup y un workflow de GitHub Actions para construir el ejecutable, incluir Chromium de Playwright, generar el instalador y adjuntarlo a GitHub Releases al publicar un tag `vX.Y.Z`.
+ - El repositorio de actualizaciones se inyecta automáticamente durante la compilación oficial mediante `${{ github.repository }}`; el código fuente no necesita conocer de antemano el usuario o nombre definitivo del repositorio.
+ - La consulta de actualizaciones es independiente de la telemetría de PostHog y no envía datos de CNRT ni datos de reservas.
++
++
++## Cambios de la versión 1.2.14
++
++- Se añadió distribución portable oficial en cada GitHub Release, además del instalador tradicional.
++- El portable incluye el ejecutable, dependencias y Chromium de Playwright; no requiere Python ni instalación.
++- El actualizador distingue automáticamente entre instalación y portable y descarga el formato correspondiente.
++- Las actualizaciones portable verifican SHA-256, validan las rutas del ZIP y rechazan enlaces simbólicos, duplicados y paquetes con estructura inesperada.
++- Un actualizador auxiliar independiente espera a que cierre la aplicación, reemplaza la carpeta y vuelve a abrir la nueva versión.
++- El reemplazo mantiene una copia anterior durante la operación y vuelve a ella si no logra activar o iniciar la nueva versión.
++- Se añadió un manifiesto portable para preservar archivos ajenos al programa que la persona haya guardado dentro de su carpeta.
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/VALIDACION_FINAL_v1.2.14.txt pa_portable_1214/Pasajes_Accesibles_CNRT/VALIDACION_FINAL_v1.2.14.txt
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/VALIDACION_FINAL_v1.2.14.txt	1970-01-01 00:00:00.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/VALIDACION_FINAL_v1.2.14.txt	2026-10-07 22:19:31.276338427 +0000
+@@ -0,0 +1,10 @@
++Pasajes Accesibles CNRT 1.2.14 — validación previa al release
++
++- Pruebas automáticas: 79/79 correctas.
++- Compilación estática con compileall: correcta.
++- Auditor wxPython: 0 hallazgos dirigidos.
++- Canal instalable y canal portable separados por contrato.
++- ZIP portable: validación de SHA-256, estructura, rutas, symlinks y duplicados.
++- Reemplazo portable: rollback probado y preservación de archivos ajenos al programa mediante manifiesto.
++- Revisión RDD aplicada: Risk, Readability, Reliability y Resilience.
++- Pendiente de validación de runtime Windows: build de PyInstaller/Inno Setup, ejecución del helper, SmartScreen/NVDA y actualización real entre dos releases.
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/__init__.py pa_portable_1214/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/__init__.py
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/__init__.py	2026-10-07 19:09:44.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/__init__.py	2026-10-07 22:14:27.599241443 +0000
+@@ -1 +1 @@
+-__version__ = "1.2.13"
++__version__ = "1.2.14"
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/app.py pa_portable_1214/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/app.py
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/app.py	2026-10-07 19:16:06.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/app.py	2026-10-07 22:14:45.287361969 +0000
+@@ -349,8 +349,9 @@
+         )
+         if notes:
+             message += f"Cambios publicados:\n{notes}\n\n"
++        package_label = "paquete portable" if info.channel == "portable" else "instalador"
+         message += (
+-            "¿Querés descargarla ahora? El instalador se verificará mediante SHA-256 antes de abrirse."
++            f"¿Querés descargarla ahora? El {package_label} se verificará mediante SHA-256 antes de aplicarse."
+         )
+         answer = wx.MessageBox(
+             message,
+@@ -374,6 +375,8 @@
+             error = None
+             try:
+                 path = self.update_service.download(info)
++                if info.channel == "portable":
++                    path = self.update_service.prepare_portable_update(path, info)
+             except Exception as exc:
+                 error = exc
+             wx.CallAfter(self._finish_update_download, info, path, error)
+@@ -387,25 +390,44 @@
+             wx.MessageBox(detail, "Actualización", wx.OK | wx.ICON_ERROR, self)
+             self._announce("La actualización no pudo descargarse o verificarse.")
+             return
++        portable = info.channel == "portable"
++        if portable:
++            action_text = (
++                "Al continuar, esta ventana se cerrará y un actualizador auxiliar reemplazará "
++                "la carpeta portable por la nueva versión. Después volverá a abrir el programa. "
++                "Tus preferencias y datos guardados en AppData no se eliminan.\n\n"
++                "¿Actualizar ahora?"
++            )
++            title = "Actualización portable lista"
++        else:
++            action_text = (
++                "Al continuar se abrirá el instalador y esta ventana se cerrará. "
++                "Tus preferencias y datos guardados en AppData no se eliminan.\n\n"
++                "¿Instalar ahora?"
++            )
++            title = "Actualización lista para instalar"
+         answer = wx.MessageBox(
+             f"Pasajes Accesibles CNRT {info.version} se descargó y su SHA-256 fue verificado.\n\n"
+-            "Al continuar se abrirá el instalador y esta ventana se cerrará. "
+-            "Tus preferencias y datos guardados en AppData no se eliminan.\n\n"
+-            "¿Instalar ahora?",
+-            "Actualización lista para instalar",
++            + action_text,
++            title,
+             wx.YES_NO | wx.NO_DEFAULT | wx.ICON_INFORMATION,
+             self,
+         )
+         if answer != wx.YES:
+-            self._announce(f"Actualización {info.version} descargada. Instalación pospuesta.")
++            self._announce(f"Actualización {info.version} descargada. Aplicación pospuesta.")
+             return
+         try:
+-            self.update_service.launch_installer(path)
++            if portable:
++                self.update_service.launch_portable_update(path)
++            else:
++                self.update_service.launch_installer(path)
+         except UpdateError as exc:
+             wx.MessageBox(str(exc), "Actualización", wx.OK | wx.ICON_ERROR, self)
+-            self._announce("Windows no pudo abrir el instalador de la actualización.")
++            self._announce("Windows no pudo iniciar la aplicación de la actualización.")
+             return
+-        self._announce("Abriendo el instalador de la actualización.")
++        self._announce(
++            "Aplicando la actualización portable." if portable else "Abriendo el instalador de la actualización."
++        )
+         wx.CallAfter(self.Close)
+ 
+     @staticmethod
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/updater.py pa_portable_1214/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/updater.py
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/updater.py	2026-10-07 19:18:12.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/pasajes_accesibles_cnrt/updater.py	2026-10-07 22:18:12.284605775 +0000
+@@ -4,10 +4,15 @@
+ import json
+ import os
+ import re
++import shutil
++import stat
+ import subprocess
++import sys
+ import tempfile
++import uuid
++import zipfile
+ from dataclasses import dataclass
+-from pathlib import Path
++from pathlib import Path, PurePosixPath
+ from typing import Callable
+ from urllib.error import HTTPError, URLError
+ from urllib.request import Request, urlopen
+@@ -18,7 +23,16 @@
+ 
+ GITHUB_API = "https://api.github.com"
+ INSTALLER_PREFIX = "Pasajes_Accesibles_CNRT_Setup_v"
+-MAX_INSTALLER_BYTES = 900 * 1024 * 1024
++PORTABLE_PREFIX = "Pasajes_Accesibles_CNRT_Portable_v"
++PORTABLE_MARKER = ".portable"
++PORTABLE_HELPER = "PasajesPortableUpdater.exe"
++PORTABLE_MANIFEST = ".portable-manifest.json"
++APP_EXECUTABLE = "Pasajes Accesibles CNRT.exe"
++CHANNEL_INSTALLER = "installer"
++CHANNEL_PORTABLE = "portable"
++MAX_UPDATE_BYTES = 1200 * 1024 * 1024
++MAX_PORTABLE_UNPACKED_BYTES = 2500 * 1024 * 1024
++MAX_PORTABLE_MEMBERS = 25000
+ REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+ SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+ VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?$")
+@@ -34,12 +48,20 @@
+     tag: str
+     release_url: str
+     notes: str
+-    installer_name: str
+-    installer_url: str
+-    installer_size: int
++    channel: str
++    asset_name: str
++    asset_url: str
++    asset_size: int
+     sha256: str
+ 
+ 
++@dataclass(frozen=True)
++class PortablePreparedUpdate:
++    version: str
++    staging_root: Path
++    portable_root: Path
++
++
+ def _version_tuple(value: str) -> tuple[int, int, int]:
+     match = VERSION_RE.fullmatch(value.strip())
+     if not match:
+@@ -60,6 +82,17 @@
+     return value if REPOSITORY_RE.fullmatch(value) else ""
+ 
+ 
++def portable_root() -> Path | None:
++    if not getattr(sys, "frozen", False):
++        return None
++    root = Path(sys.executable).resolve().parent
++    return root if (root / PORTABLE_MARKER).is_file() else None
++
++
++def detect_update_channel() -> str:
++    return CHANNEL_PORTABLE if portable_root() is not None else CHANNEL_INSTALLER
++
++
+ def _request_json(url: str, timeout: float = 15.0) -> dict:
+     request = Request(
+         url,
+@@ -102,7 +135,7 @@
+     return ""
+ 
+ 
+-def _fetch_checksum_asset(url: str, installer_name: str, repository: str, tag: str, timeout: float) -> str:
++def _fetch_checksum_asset(url: str, repository: str, tag: str, timeout: float) -> str:
+     prefix = _safe_release_download_prefix(repository, tag)
+     if not url.startswith(prefix) or not url.startswith("https://"):
+         raise UpdateError("La URL del archivo de comprobación no pertenece al release esperado.")
+@@ -118,11 +151,44 @@
+     return first.lower()
+ 
+ 
++def _expected_asset_name(version: str, channel: str) -> str:
++    if channel == CHANNEL_PORTABLE:
++        return f"{PORTABLE_PREFIX}{version}.zip"
++    if channel == CHANNEL_INSTALLER:
++        return f"{INSTALLER_PREFIX}{version}.exe"
++    raise UpdateError("El canal de actualización no es válido.")
++
++
++def _safe_zip_path(name: str) -> PurePosixPath:
++    if not name or "\\" in name or "\x00" in name:
++        raise UpdateError("El paquete portable contiene una ruta no válida.")
++    path = PurePosixPath(name)
++    if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
++        raise UpdateError("El paquete portable contiene una ruta insegura.")
++    if any(":" in part for part in path.parts):
++        raise UpdateError("El paquete portable contiene una ruta incompatible con Windows.")
++    return path
++
++
++def _zip_member_is_symlink(member: zipfile.ZipInfo) -> bool:
++    mode = (member.external_attr >> 16) & 0o170000
++    return mode == stat.S_IFLNK
++
++
+ class GitHubUpdateService:
+-    def __init__(self, repository: str | None = None, current_version: str = __version__, timeout: float = 15.0):
++    def __init__(
++        self,
++        repository: str | None = None,
++        current_version: str = __version__,
++        timeout: float = 15.0,
++        channel: str | None = None,
++    ):
+         self.repository = (repository or configured_repository()).strip()
+         self.current_version = current_version
+         self.timeout = timeout
++        self.channel = channel or detect_update_channel()
++        if self.channel not in (CHANNEL_INSTALLER, CHANNEL_PORTABLE):
++            raise ValueError(f"Canal de actualización no válido: {self.channel!r}")
+ 
+     @property
+     def configured(self) -> bool:
+@@ -146,33 +212,33 @@
+         if not is_newer_version(version, self.current_version):
+             return None
+ 
+-        installer_name = f"{INSTALLER_PREFIX}{version}.exe"
++        asset_name = _expected_asset_name(version, self.channel)
+         assets = data.get("assets") or []
+         if not isinstance(assets, list):
+             raise UpdateError("GitHub no devolvió una lista válida de archivos del release.")
+-        installer = next((a for a in assets if isinstance(a, dict) and a.get("name") == installer_name), None)
+-        if installer is None:
+-            raise UpdateError(f"La versión {version} no contiene el instalador esperado {installer_name}.")
+-        installer_url = str(installer.get("browser_download_url") or "")
++        asset = next((a for a in assets if isinstance(a, dict) and a.get("name") == asset_name), None)
++        if asset is None:
++            label = "portable" if self.channel == CHANNEL_PORTABLE else "instalador"
++            raise UpdateError(f"La versión {version} no contiene el {label} esperado {asset_name}.")
++        asset_url = str(asset.get("browser_download_url") or "")
+         prefix = _safe_release_download_prefix(self.repository, tag)
+-        if not installer_url.startswith(prefix) or not installer_url.startswith("https://"):
+-            raise UpdateError("La URL del instalador no pertenece al release esperado.")
++        if not asset_url.startswith(prefix) or not asset_url.startswith("https://"):
++            raise UpdateError("La URL de la actualización no pertenece al release esperado.")
+         try:
+-            installer_size = int(installer.get("size") or 0)
++            asset_size = int(asset.get("size") or 0)
+         except (TypeError, ValueError):
+-            installer_size = 0
+-        if installer_size <= 0 or installer_size > MAX_INSTALLER_BYTES:
+-            raise UpdateError("El tamaño publicado del instalador no es válido.")
++            asset_size = 0
++        if asset_size <= 0 or asset_size > MAX_UPDATE_BYTES:
++            raise UpdateError("El tamaño publicado de la actualización no es válido.")
+ 
+-        sha256 = _asset_sha256(installer)
++        sha256 = _asset_sha256(asset)
+         if not sha256:
+-            checksum_name = installer_name + ".sha256"
++            checksum_name = asset_name + ".sha256"
+             checksum = next((a for a in assets if isinstance(a, dict) and a.get("name") == checksum_name), None)
+             if checksum is None:
+-                raise UpdateError("El release no publica un SHA-256 verificable para el instalador.")
++                raise UpdateError("El release no publica un SHA-256 verificable para esta actualización.")
+             sha256 = _fetch_checksum_asset(
+                 str(checksum.get("browser_download_url") or ""),
+-                installer_name,
+                 self.repository,
+                 tag,
+                 self.timeout,
+@@ -187,23 +253,26 @@
+             tag=tag,
+             release_url=release_url,
+             notes=notes,
+-            installer_name=installer_name,
+-            installer_url=installer_url,
+-            installer_size=installer_size,
++            channel=self.channel,
++            asset_name=asset_name,
++            asset_url=asset_url,
++            asset_size=asset_size,
+             sha256=sha256,
+         )
+ 
+     def download(self, info: UpdateInfo, progress: Callable[[int, int], None] | None = None) -> Path:
++        if info.channel != self.channel:
++            raise UpdateError("La actualización descargada pertenece a otro canal de distribución.")
+         updates_dir = APP_DIR / "updates"
+         updates_dir.mkdir(parents=True, exist_ok=True)
+-        destination = updates_dir / info.installer_name
++        destination = updates_dir / info.asset_name
+         part = destination.with_suffix(destination.suffix + ".part")
+         try:
+             part.unlink(missing_ok=True)
+         except TypeError:  # Python 3.10 compatibility
+             if part.exists():
+                 part.unlink()
+-        request = Request(info.installer_url, headers={"User-Agent": f"Pasajes-Accesibles-CNRT/{__version__}"})
++        request = Request(info.asset_url, headers={"User-Agent": f"Pasajes-Accesibles-CNRT/{__version__}"})
+         digest = hashlib.sha256()
+         written = 0
+         try:
+@@ -213,12 +282,12 @@
+                     if not chunk:
+                         break
+                     written += len(chunk)
+-                    if written > MAX_INSTALLER_BYTES or written > info.installer_size + 1024:
+-                        raise UpdateError("La descarga excedió el tamaño publicado para el instalador.")
++                    if written > MAX_UPDATE_BYTES or written > info.asset_size + 1024:
++                        raise UpdateError("La descarga excedió el tamaño publicado para la actualización.")
+                     digest.update(chunk)
+                     handle.write(chunk)
+                     if progress:
+-                        progress(written, info.installer_size)
++                        progress(written, info.asset_size)
+         except UpdateError:
+             part.unlink(missing_ok=True)
+             raise
+@@ -226,13 +295,13 @@
+             part.unlink(missing_ok=True)
+             raise UpdateError("La descarga de la actualización no pudo completarse.") from exc
+ 
+-        if written != info.installer_size:
++        if written != info.asset_size:
+             part.unlink(missing_ok=True)
+-            raise UpdateError("El instalador descargado no tiene el tamaño publicado por GitHub.")
++            raise UpdateError("La actualización descargada no tiene el tamaño publicado por GitHub.")
+         actual = digest.hexdigest().lower()
+         if actual != info.sha256.lower():
+             part.unlink(missing_ok=True)
+-            raise UpdateError("El SHA-256 del instalador no coincide. La actualización fue descartada.")
++            raise UpdateError("El SHA-256 de la actualización no coincide. La descarga fue descartada.")
+         os.replace(part, destination)
+         return destination
+ 
+@@ -251,3 +320,129 @@
+             )
+         except OSError as exc:
+             raise UpdateError("Windows no pudo abrir el instalador descargado.") from exc
++
++    def prepare_portable_update(
++        self,
++        archive: Path,
++        info: UpdateInfo,
++        portable_dir: Path | None = None,
++    ) -> PortablePreparedUpdate:
++        if info.channel != CHANNEL_PORTABLE or self.channel != CHANNEL_PORTABLE:
++            raise UpdateError("Este paquete no corresponde al canal portable.")
++        archive = Path(archive).resolve()
++        if archive.suffix.lower() != ".zip" or archive.name != info.asset_name:
++            raise UpdateError("El archivo descargado no tiene el nombre del paquete portable esperado.")
++        root = Path(portable_dir).resolve() if portable_dir is not None else portable_root()
++        if root is None or not (root / PORTABLE_MARKER).is_file():
++            raise UpdateError("No se pudo identificar una instalación portable válida.")
++        if not (root / PORTABLE_HELPER).is_file():
++            raise UpdateError("La versión portable actual no contiene su actualizador auxiliar.")
++
++        staging = Path(
++            tempfile.mkdtemp(
++                prefix=f".Pasajes_Accesibles_CNRT_update_{info.version}_{uuid.uuid4().hex[:8]}_",
++                dir=str(root.parent),
++            )
++        ).resolve()
++        try:
++            with zipfile.ZipFile(archive, "r") as zf:
++                members = zf.infolist()
++                if not members or len(members) > MAX_PORTABLE_MEMBERS:
++                    raise UpdateError("El paquete portable tiene una cantidad de archivos no válida.")
++                total_unpacked = sum(max(0, int(member.file_size)) for member in members)
++                if total_unpacked > MAX_PORTABLE_UNPACKED_BYTES:
++                    raise UpdateError("El paquete portable excede el tamaño máximo permitido al descomprimirse.")
++
++                parsed: list[tuple[zipfile.ZipInfo, PurePosixPath]] = []
++                roots: set[str] = set()
++                relative_names: set[str] = set()
++                for member in members:
++                    path = _safe_zip_path(member.filename.rstrip("/"))
++                    if _zip_member_is_symlink(member):
++                        raise UpdateError("El paquete portable contiene un enlace simbólico no permitido.")
++                    roots.add(path.parts[0])
++                    if len(path.parts) == 1:
++                        continue
++                    relative = PurePosixPath(*path.parts[1:])
++                    key = relative.as_posix().casefold()
++                    if key in relative_names and not member.is_dir():
++                        raise UpdateError("El paquete portable contiene archivos duplicados.")
++                    relative_names.add(key)
++                    parsed.append((member, relative))
++                if len(roots) != 1:
++                    raise UpdateError("El paquete portable debe contener una única carpeta raíz.")
++
++                for member, relative in parsed:
++                    destination = staging.joinpath(*relative.parts)
++                    if member.is_dir():
++                        destination.mkdir(parents=True, exist_ok=True)
++                        continue
++                    destination.parent.mkdir(parents=True, exist_ok=True)
++                    resolved_parent = destination.parent.resolve()
++                    if os.path.commonpath([str(staging), str(resolved_parent)]) != str(staging):
++                        raise UpdateError("El paquete portable intentó escribir fuera de su carpeta temporal.")
++                    with zf.open(member, "r") as source, destination.open("wb") as target:
++                        shutil.copyfileobj(source, target, length=1024 * 1024)
++
++            required = [
++                staging / PORTABLE_MARKER,
++                staging / PORTABLE_MANIFEST,
++                staging / APP_EXECUTABLE,
++                staging / PORTABLE_HELPER,
++            ]
++            if not all(path.is_file() for path in required):
++                raise UpdateError("El paquete portable no contiene todos los archivos requeridos.")
++            marker = (staging / PORTABLE_MARKER).read_text(encoding="utf-8", errors="replace")
++            if "channel=portable" not in marker:
++                raise UpdateError("El paquete descargado no está marcado como versión portable.")
++            try:
++                manifest = json.loads((staging / PORTABLE_MANIFEST).read_text(encoding="utf-8"))
++                managed = manifest.get("files") if isinstance(manifest, dict) else None
++            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
++                raise UpdateError("El manifiesto del paquete portable no es válido.") from exc
++            if not isinstance(managed, list) or not all(isinstance(item, str) and item for item in managed):
++                raise UpdateError("El manifiesto del paquete portable no contiene una lista válida de archivos.")
++            required_names = {PORTABLE_MARKER, APP_EXECUTABLE, PORTABLE_HELPER}
++            if not required_names.issubset({item.replace("\\", "/") for item in managed}):
++                raise UpdateError("El manifiesto portable no declara los archivos esenciales del programa.")
++            return PortablePreparedUpdate(info.version, staging, root)
++        except Exception:
++            shutil.rmtree(staging, ignore_errors=True)
++            raise
++
++    @staticmethod
++    def launch_portable_update(prepared: PortablePreparedUpdate) -> None:
++        if os.name != "nt":
++            raise UpdateError("La actualización portable automática solo está disponible en Windows.")
++        root = prepared.portable_root.resolve()
++        staging = prepared.staging_root.resolve()
++        if staging.parent != root.parent:
++            raise UpdateError("La carpeta temporal portable no está en la ubicación esperada.")
++        if not (root / PORTABLE_MARKER).is_file() or not (staging / PORTABLE_MARKER).is_file():
++            raise UpdateError("No se pudo validar la carpeta portable antes de actualizar.")
++        source_helper = root / PORTABLE_HELPER
++        if not source_helper.is_file():
++            raise UpdateError("No se encontró el actualizador auxiliar de la versión portable.")
++
++        helper_dir = APP_DIR / "updates"
++        helper_dir.mkdir(parents=True, exist_ok=True)
++        helper_copy = helper_dir / f"PasajesPortableUpdater-{prepared.version}.exe"
++        try:
++            shutil.copy2(source_helper, helper_copy)
++            subprocess.Popen(
++                [
++                    str(helper_copy),
++                    "--wait-pid",
++                    str(os.getpid()),
++                    "--source",
++                    str(staging),
++                    "--target",
++                    str(root),
++                    "--app",
++                    APP_EXECUTABLE,
++                ],
++                cwd=str(helper_dir),
++                close_fds=True,
++            )
++        except OSError as exc:
++            raise UpdateError("Windows no pudo iniciar el actualizador portable auxiliar.") from exc
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/portable_updater.py pa_portable_1214/Pasajes_Accesibles_CNRT/portable_updater.py
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/portable_updater.py	1970-01-01 00:00:00.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/portable_updater.py	2026-10-07 22:18:12.596955574 +0000
+@@ -0,0 +1,154 @@
++from __future__ import annotations
++
++import argparse
++import ctypes
++import json
++import os
++import shutil
++import subprocess
++import time
++from pathlib import Path
++
++PORTABLE_MARKER = ".portable"
++PORTABLE_MANIFEST = ".portable-manifest.json"
++WAIT_TIMEOUT_MS = 120_000
++RETRY_SECONDS = 45
++
++
++def _wait_for_process(pid: int) -> None:
++    if os.name != "nt" or pid <= 0:
++        return
++    SYNCHRONIZE = 0x00100000
++    kernel32 = ctypes.windll.kernel32
++    handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
++    if not handle:
++        return
++    try:
++        kernel32.WaitForSingleObject(handle, WAIT_TIMEOUT_MS)
++    finally:
++        kernel32.CloseHandle(handle)
++
++
++def _retry(action, description: str) -> None:
++    deadline = time.monotonic() + RETRY_SECONDS
++    last_error: OSError | None = None
++    while time.monotonic() < deadline:
++        try:
++            action()
++            return
++        except OSError as exc:
++            last_error = exc
++            time.sleep(1)
++    raise RuntimeError(f"No se pudo {description}: {last_error}")
++
++
++def _safe_remove_tree(path: Path) -> None:
++    if not path.exists():
++        return
++    if not (path / PORTABLE_MARKER).is_file():
++        raise RuntimeError("Se rechazó borrar una carpeta que no pertenece a Pasajes Accesibles CNRT portable.")
++    _retry(lambda: shutil.rmtree(path), "eliminar la copia anterior")
++
++
++def _managed_files(root: Path) -> set[str]:
++    manifest_path = root / PORTABLE_MANIFEST
++    try:
++        data = json.loads(manifest_path.read_text(encoding="utf-8"))
++        files = data.get("files") if isinstance(data, dict) else None
++    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
++        raise RuntimeError("La versión portable actual no tiene un manifiesto válido.") from exc
++    if not isinstance(files, list) or not all(isinstance(item, str) and item for item in files):
++        raise RuntimeError("La versión portable actual no tiene un manifiesto válido.")
++    return {item.replace("\\", "/").casefold() for item in files}
++
++
++def _preserve_user_files(backup: Path, target: Path, managed: set[str]) -> None:
++    for source in backup.rglob("*"):
++        if not source.is_file() or source.is_symlink():
++            continue
++        relative = source.relative_to(backup)
++        key = relative.as_posix().casefold()
++        if key in managed or relative.name == PORTABLE_MANIFEST:
++            continue
++        destination = target / relative
++        if destination.exists():
++            continue
++        destination.parent.mkdir(parents=True, exist_ok=True)
++        shutil.copy2(source, destination)
++
++
++def _replace_portable(source: Path, target: Path, app_name: str) -> None:
++    source = source.resolve()
++    target = target.resolve()
++    if source.parent != target.parent:
++        raise RuntimeError("La actualización portable no está en la misma unidad que la aplicación.")
++    if not (source / PORTABLE_MARKER).is_file() or not (target / PORTABLE_MARKER).is_file():
++        raise RuntimeError("No se reconoció una carpeta portable válida.")
++    if not (source / app_name).is_file():
++        raise RuntimeError("La nueva versión no contiene el ejecutable principal.")
++    if not (source / PORTABLE_MANIFEST).is_file():
++        raise RuntimeError("La nueva versión no contiene su manifiesto portable.")
++    managed = _managed_files(target)
++
++    backup = target.parent / f".{target.name}.previous"
++    _safe_remove_tree(backup)
++
++    _retry(lambda: os.replace(target, backup), "guardar temporalmente la versión anterior")
++    try:
++        _retry(lambda: os.replace(source, target), "activar la nueva versión")
++        _preserve_user_files(backup, target, managed)
++    except Exception:
++        try:
++            if target.exists():
++                failed = target.parent / f".{target.name}.failed"
++                _safe_remove_tree(failed)
++                os.replace(target, failed)
++            if backup.exists():
++                os.replace(backup, target)
++        finally:
++            raise
++
++    try:
++        process = subprocess.Popen([str(target / app_name)], cwd=str(target), close_fds=True)
++    except OSError:
++        failed = target.parent / f".{target.name}.failed"
++        try:
++            _safe_remove_tree(failed)
++            os.replace(target, failed)
++            os.replace(backup, target)
++        finally:
++            try:
++                subprocess.Popen([str(target / app_name)], cwd=str(target), close_fds=True)
++            except OSError:
++                pass
++        raise
++
++    # Si Windows pudo iniciar la nueva aplicación, ya no necesitamos la copia
++    # anterior. Se deja un pequeño margen para que el proceso termine de cargar.
++    time.sleep(3)
++    if process.poll() is None:
++        try:
++            _safe_remove_tree(backup)
++        except Exception:
++            # Una copia anterior que no pudo borrarse no invalida la actualización.
++            pass
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(add_help=False)
++    parser.add_argument("--wait-pid", type=int, required=True)
++    parser.add_argument("--source", required=True)
++    parser.add_argument("--target", required=True)
++    parser.add_argument("--app", required=True)
++    args = parser.parse_args()
++
++    try:
++        _wait_for_process(args.wait_pid)
++        _replace_portable(Path(args.source), Path(args.target), args.app)
++        return 0
++    except Exception:
++        return 2
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/tests/test_executable_release_contract.py pa_portable_1214/Pasajes_Accesibles_CNRT/tests/test_executable_release_contract.py
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/tests/test_executable_release_contract.py	2026-10-07 19:19:54.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/tests/test_executable_release_contract.py	2026-10-07 22:18:30.752983606 +0000
+@@ -7,7 +7,7 @@
+ 
+ 
+ class ExecutableReleaseContractTests(unittest.TestCase):
+-    def test_release_workflow_builds_windows_installer_and_checksum(self):
++    def test_release_workflow_builds_installer_portable_and_checksums(self):
+         workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+         self.assertIn('runs-on: windows-2025', workflow)
+         self.assertIn('persist-credentials: false', workflow)
+@@ -16,9 +16,14 @@
+         self.assertIn('Verify injected update repository', workflow)
+         self.assertIn('python -m playwright install chromium', workflow)
+         self.assertIn('Inno Setup 6', workflow)
++        self.assertIn('Build portable updater helper', workflow)
++        self.assertIn('PasajesPortableUpdater.exe', workflow)
++        self.assertIn('Pasajes_Accesibles_CNRT_Portable_v$version.zip', workflow)
++        self.assertIn('channel=portable', workflow)
++        self.assertIn('write_portable_manifest.py', workflow)
+         self.assertIn('Get-FileHash', workflow)
+         self.assertIn('python -m unittest discover -s tests -q', workflow)
+-        self.assertIn('python -m compileall -q pasajes_accesibles_cnrt launcher.py tools', workflow)
++        self.assertIn('python -m compileall -q pasajes_accesibles_cnrt launcher.py portable_updater.py tools', workflow)
+         self.assertIn('gh release create', workflow)
+ 
+     def test_installer_is_per_user_and_preserves_appdata(self):
+@@ -34,6 +39,13 @@
+         self.assertIn('Path(sys.executable).resolve().parent / "ms-playwright"', client)
+         self.assertIn('PLAYWRIGHT_BROWSERS_PATH', client)
+ 
++    def test_portable_helper_is_separate_from_main_executable(self):
++        helper = (ROOT / "portable_updater.py").read_text(encoding="utf-8")
++        self.assertIn('os.replace(target, backup)', helper)
++        self.assertIn('os.replace(source, target)', helper)
++        self.assertIn('os.replace(backup, target)', helper)
++        self.assertIn('PORTABLE_MARKER', helper)
++
+     def test_update_menu_and_automatic_check_are_exposed(self):
+         app = (ROOT / "pasajes_accesibles_cnrt" / "app.py").read_text(encoding="utf-8")
+         self.assertIn('"&Buscar actualizaciones..."', app)
+@@ -42,6 +54,8 @@
+         self.assertIn('self._initialize_telemetry_consent()\n        wx.CallLater(2500, self._auto_check_updates)', app)
+         self.assertIn('24 * 60 * 60', app)
+         self.assertIn('SHA-256', app)
++        self.assertIn('prepare_portable_update', app)
++        self.assertIn('launch_portable_update', app)
+ 
+     def test_automatic_update_check_prompts_when_a_new_version_exists(self):
+         app = (ROOT / "pasajes_accesibles_cnrt" / "app.py").read_text(encoding="utf-8")
+@@ -52,6 +66,5 @@
+         self.assertNotIn('Para verla, abra Ayuda y elija Buscar actualizaciones.', app)
+ 
+ 
+-
+ if __name__ == "__main__":
+     unittest.main()
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/tests/test_portable_updater.py pa_portable_1214/Pasajes_Accesibles_CNRT/tests/test_portable_updater.py
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/tests/test_portable_updater.py	1970-01-01 00:00:00.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/tests/test_portable_updater.py	2026-10-07 22:18:30.752560286 +0000
+@@ -0,0 +1,83 @@
++from __future__ import annotations
++
++import json
++import tempfile
++import unittest
++from pathlib import Path
++from unittest.mock import Mock, patch
++
++import portable_updater
++
++
++class PortableUpdaterHelperTests(unittest.TestCase):
++    def _make_tree(self, root: Path, label: str) -> None:
++        root.mkdir()
++        (root / portable_updater.PORTABLE_MARKER).write_text("channel=portable", encoding="utf-8")
++        (root / "Pasajes Accesibles CNRT.exe").write_text(label, encoding="utf-8")
++        (root / "version.txt").write_text(label, encoding="utf-8")
++        (root / portable_updater.PORTABLE_MANIFEST).write_text(
++            json.dumps({"files": [portable_updater.PORTABLE_MARKER, "Pasajes Accesibles CNRT.exe", "version.txt"]}),
++            encoding="utf-8",
++        )
++
++    def test_replacement_swaps_complete_directory_and_removes_backup_after_start(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            base = Path(tmp)
++            target = base / "Pasajes Accesibles CNRT"
++            source = base / ".update"
++            self._make_tree(target, "old")
++            self._make_tree(source, "new")
++            process = Mock()
++            process.poll.return_value = None
++            with patch.object(portable_updater.subprocess, "Popen", return_value=process), patch.object(
++                portable_updater.time, "sleep", return_value=None
++            ):
++                portable_updater._replace_portable(source, target, "Pasajes Accesibles CNRT.exe")
++            self.assertEqual((target / "version.txt").read_text(encoding="utf-8"), "new")
++            self.assertFalse((base / ".Pasajes Accesibles CNRT.previous").exists())
++
++    def test_user_file_not_in_manifest_is_preserved(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            base = Path(tmp)
++            target = base / "Pasajes Accesibles CNRT"
++            source = base / ".update"
++            self._make_tree(target, "old")
++            self._make_tree(source, "new")
++            (target / "mis_notas.txt").write_text("guardar", encoding="utf-8")
++            process = Mock()
++            process.poll.return_value = None
++            with patch.object(portable_updater.subprocess, "Popen", return_value=process), patch.object(
++                portable_updater.time, "sleep", return_value=None
++            ):
++                portable_updater._replace_portable(source, target, "Pasajes Accesibles CNRT.exe")
++            self.assertEqual((target / "mis_notas.txt").read_text(encoding="utf-8"), "guardar")
++            self.assertEqual((target / "version.txt").read_text(encoding="utf-8"), "new")
++
++    def test_launch_failure_rolls_back_previous_portable(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            base = Path(tmp)
++            target = base / "Pasajes Accesibles CNRT"
++            source = base / ".update"
++            self._make_tree(target, "old")
++            self._make_tree(source, "new")
++            with patch.object(portable_updater.subprocess, "Popen", side_effect=OSError("cannot start")), patch.object(
++                portable_updater.time, "sleep", return_value=None
++            ):
++                with self.assertRaises(OSError):
++                    portable_updater._replace_portable(source, target, "Pasajes Accesibles CNRT.exe")
++            self.assertEqual((target / "version.txt").read_text(encoding="utf-8"), "old")
++            self.assertTrue((base / ".Pasajes Accesibles CNRT.failed").exists())
++
++    def test_rejects_replacement_without_portable_markers(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            base = Path(tmp)
++            target = base / "target"
++            source = base / "source"
++            target.mkdir()
++            source.mkdir()
++            with self.assertRaises(RuntimeError):
++                portable_updater._replace_portable(source, target, "Pasajes Accesibles CNRT.exe")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/tests/test_updater.py pa_portable_1214/Pasajes_Accesibles_CNRT/tests/test_updater.py
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/tests/test_updater.py	2026-10-07 19:19:08.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/tests/test_updater.py	2026-10-07 22:18:30.752314604 +0000
+@@ -4,8 +4,10 @@
+ import io
+ import json
+ import os
++import sys
+ import tempfile
+ import unittest
++import zipfile
+ from pathlib import Path
+ from unittest.mock import patch
+ 
+@@ -26,12 +28,31 @@
+         return False
+ 
+ 
++def update_info(channel: str, payload: bytes = b"payload", version: str = "1.2.15") -> updater.UpdateInfo:
++    name = (
++        f"{updater.PORTABLE_PREFIX}{version}.zip"
++        if channel == updater.CHANNEL_PORTABLE
++        else f"{updater.INSTALLER_PREFIX}{version}.exe"
++    )
++    return updater.UpdateInfo(
++        version=version,
++        tag=f"v{version}",
++        release_url="",
++        notes="",
++        channel=channel,
++        asset_name=name,
++        asset_url=f"https://github.com/example/repo/releases/download/v{version}/{name}",
++        asset_size=len(payload),
++        sha256=hashlib.sha256(payload).hexdigest(),
++    )
++
++
+ class UpdaterTests(unittest.TestCase):
+     def test_semantic_version_comparison(self):
+-        self.assertTrue(updater.is_newer_version("1.2.14", "1.2.13"))
++        self.assertTrue(updater.is_newer_version("1.2.15", "1.2.14"))
+         self.assertTrue(updater.is_newer_version("v2.0.0", "1.9.9"))
+-        self.assertFalse(updater.is_newer_version("1.2.13", "1.2.13"))
+-        self.assertFalse(updater.is_newer_version("1.2.12", "1.2.13"))
++        self.assertFalse(updater.is_newer_version("1.2.14", "1.2.14"))
++        self.assertFalse(updater.is_newer_version("1.2.13", "1.2.14"))
+ 
+     def test_official_repository_cannot_be_overridden_by_environment(self):
+         with patch.object(updater, "GITHUB_REPOSITORY", "martin/oficial"), patch.dict(
+@@ -45,125 +66,225 @@
+         ):
+             self.assertEqual(updater.configured_repository(), "martin/pruebas")
+ 
++    def test_portable_channel_is_detected_only_with_marker_next_to_frozen_exe(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            exe = Path(tmp) / updater.APP_EXECUTABLE
++            exe.write_bytes(b"")
++            with patch.object(sys, "frozen", True, create=True), patch.object(sys, "executable", str(exe)):
++                self.assertEqual(updater.detect_update_channel(), updater.CHANNEL_INSTALLER)
++                (Path(tmp) / updater.PORTABLE_MARKER).write_text("channel=portable", encoding="utf-8")
++                self.assertEqual(updater.detect_update_channel(), updater.CHANNEL_PORTABLE)
++
+     def test_latest_release_requires_expected_installer_and_sha256(self):
+         data = b"installer-content"
+         digest = hashlib.sha256(data).hexdigest()
++        name = "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe"
+         release = {
+-            "tag_name": "v1.2.14",
++            "tag_name": "v1.2.15",
+             "draft": False,
+             "prerelease": False,
+-            "html_url": "https://github.com/example/repo/releases/tag/v1.2.14",
++            "html_url": "https://github.com/example/repo/releases/tag/v1.2.15",
+             "body": "Cambios",
+             "assets": [{
+-                "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
+-                "browser_download_url": "https://github.com/example/repo/releases/download/v1.2.14/Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
++                "name": name,
++                "browser_download_url": f"https://github.com/example/repo/releases/download/v1.2.15/{name}",
+                 "size": len(data),
+                 "digest": "sha256:" + digest,
+             }],
+         }
+         with patch.object(updater, "urlopen", return_value=FakeResponse(json.dumps(release).encode())):
+-            info = updater.GitHubUpdateService("example/repo", current_version="1.2.13").latest()
++            info = updater.GitHubUpdateService(
++                "example/repo", current_version="1.2.14", channel=updater.CHANNEL_INSTALLER
++            ).latest()
+         self.assertIsNotNone(info)
+-        self.assertEqual(info.version, "1.2.14")
++        self.assertEqual(info.version, "1.2.15")
++        self.assertEqual(info.channel, updater.CHANNEL_INSTALLER)
+         self.assertEqual(info.sha256, digest)
+ 
++    def test_latest_release_selects_portable_zip_for_portable_channel(self):
++        data = b"portable-content"
++        digest = hashlib.sha256(data).hexdigest()
++        name = "Pasajes_Accesibles_CNRT_Portable_v1.2.15.zip"
++        release = {
++            "tag_name": "v1.2.15",
++            "draft": False,
++            "prerelease": False,
++            "assets": [{
++                "name": name,
++                "browser_download_url": f"https://github.com/example/repo/releases/download/v1.2.15/{name}",
++                "size": len(data),
++                "digest": "sha256:" + digest,
++            }],
++        }
++        with patch.object(updater, "urlopen", return_value=FakeResponse(json.dumps(release).encode())):
++            info = updater.GitHubUpdateService(
++                "example/repo", current_version="1.2.14", channel=updater.CHANNEL_PORTABLE
++            ).latest()
++        self.assertIsNotNone(info)
++        self.assertEqual(info.asset_name, name)
++        self.assertEqual(info.channel, updater.CHANNEL_PORTABLE)
++
+     def test_latest_release_returns_none_when_not_newer(self):
+-        release = {"tag_name": "v1.2.13", "draft": False, "prerelease": False, "assets": []}
++        release = {"tag_name": "v1.2.14", "draft": False, "prerelease": False, "assets": []}
+         with patch.object(updater, "urlopen", return_value=FakeResponse(json.dumps(release).encode())):
+-            info = updater.GitHubUpdateService("example/repo", current_version="1.2.13").latest()
++            info = updater.GitHubUpdateService(
++                "example/repo", current_version="1.2.14", channel=updater.CHANNEL_INSTALLER
++            ).latest()
+         self.assertIsNone(info)
+ 
+-    def test_latest_release_rejects_installer_from_another_host_or_repository(self):
++    def test_latest_release_rejects_asset_from_another_host_or_repository(self):
+         digest = hashlib.sha256(b"x").hexdigest()
+         release = {
+-            "tag_name": "v1.2.14",
++            "tag_name": "v1.2.15",
+             "draft": False,
+             "prerelease": False,
+             "assets": [{
+-                "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
+-                "browser_download_url": "https://evil.example/Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
++                "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
++                "browser_download_url": "https://evil.example/Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
+                 "size": 1,
+                 "digest": "sha256:" + digest,
+             }],
+         }
+         with patch.object(updater, "urlopen", return_value=FakeResponse(json.dumps(release).encode())):
+             with self.assertRaises(updater.UpdateError):
+-                updater.GitHubUpdateService("example/repo", current_version="1.2.13").latest()
++                updater.GitHubUpdateService(
++                    "example/repo", current_version="1.2.14", channel=updater.CHANNEL_INSTALLER
++                ).latest()
+ 
+     def test_latest_release_rejects_checksum_from_another_repository(self):
+         release = {
+-            "tag_name": "v1.2.14",
++            "tag_name": "v1.2.15",
+             "draft": False,
+             "prerelease": False,
+             "assets": [
+                 {
+-                    "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
+-                    "browser_download_url": "https://github.com/example/repo/releases/download/v1.2.14/Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
++                    "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
++                    "browser_download_url": "https://github.com/example/repo/releases/download/v1.2.15/Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
+                     "size": 1,
+                 },
+                 {
+-                    "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe.sha256",
+-                    "browser_download_url": "https://github.com/attacker/repo/releases/download/v1.2.14/Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe.sha256",
++                    "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe.sha256",
++                    "browser_download_url": "https://github.com/attacker/repo/releases/download/v1.2.15/Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe.sha256",
+                     "size": 80,
+                 },
+             ],
+         }
+         with patch.object(updater, "urlopen", return_value=FakeResponse(json.dumps(release).encode())):
+             with self.assertRaises(updater.UpdateError):
+-                updater.GitHubUpdateService("example/repo", current_version="1.2.13").latest()
++                updater.GitHubUpdateService(
++                    "example/repo", current_version="1.2.14", channel=updater.CHANNEL_INSTALLER
++                ).latest()
+ 
+     def test_release_without_digest_or_checksum_is_rejected(self):
+         release = {
+-            "tag_name": "v1.2.14",
++            "tag_name": "v1.2.15",
+             "draft": False,
+             "prerelease": False,
+             "assets": [{
+-                "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
+-                "browser_download_url": "https://github.com/example/repo/releases/download/v1.2.14/Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
++                "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
++                "browser_download_url": "https://github.com/example/repo/releases/download/v1.2.15/Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
+                 "size": 100,
+             }],
+         }
+         with patch.object(updater, "urlopen", return_value=FakeResponse(json.dumps(release).encode())):
+             with self.assertRaises(updater.UpdateError):
+-                updater.GitHubUpdateService("example/repo", current_version="1.2.13").latest()
++                updater.GitHubUpdateService(
++                    "example/repo", current_version="1.2.14", channel=updater.CHANNEL_INSTALLER
++                ).latest()
+ 
+-    def test_download_rejects_tampered_installer(self):
++    def test_download_rejects_tampered_asset(self):
+         payload = b"tampered"
+-        info = updater.UpdateInfo(
+-            version="1.2.14",
+-            tag="v1.2.14",
+-            release_url="",
+-            notes="",
+-            installer_name="Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
+-            installer_url="https://github.com/example/repo/releases/download/v1.2.14/Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
+-            installer_size=len(payload),
+-            sha256="0" * 64,
+-        )
++        info = update_info(updater.CHANNEL_INSTALLER, payload)
++        info = updater.UpdateInfo(**{**info.__dict__, "sha256": "0" * 64})
+         with tempfile.TemporaryDirectory() as tmp, patch.object(updater, "APP_DIR", Path(tmp)), patch.object(
+             updater, "urlopen", return_value=FakeResponse(payload)
+         ):
+             with self.assertRaises(updater.UpdateError):
+-                updater.GitHubUpdateService("example/repo").download(info)
+-            self.assertFalse((Path(tmp) / "updates" / info.installer_name).exists())
++                updater.GitHubUpdateService("example/repo", channel=updater.CHANNEL_INSTALLER).download(info)
++            self.assertFalse((Path(tmp) / "updates" / info.asset_name).exists())
+ 
+     def test_download_accepts_matching_sha256(self):
+         payload = b"valid-installer"
+-        info = updater.UpdateInfo(
+-            version="1.2.14",
+-            tag="v1.2.14",
+-            release_url="",
+-            notes="",
+-            installer_name="Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
+-            installer_url="https://github.com/example/repo/releases/download/v1.2.14/Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe",
+-            installer_size=len(payload),
+-            sha256=hashlib.sha256(payload).hexdigest(),
+-        )
++        info = update_info(updater.CHANNEL_INSTALLER, payload)
+         with tempfile.TemporaryDirectory() as tmp, patch.object(updater, "APP_DIR", Path(tmp)), patch.object(
+             updater, "urlopen", return_value=FakeResponse(payload)
+         ):
+-            path = updater.GitHubUpdateService("example/repo").download(info)
++            path = updater.GitHubUpdateService("example/repo", channel=updater.CHANNEL_INSTALLER).download(info)
+             self.assertEqual(path.read_bytes(), payload)
+ 
++    def test_download_rejects_cross_channel_info(self):
++        info = update_info(updater.CHANNEL_PORTABLE, b"portable")
++        with self.assertRaises(updater.UpdateError):
++            updater.GitHubUpdateService("example/repo", channel=updater.CHANNEL_INSTALLER).download(info)
++
++    def test_prepare_portable_update_extracts_valid_package_next_to_current_folder(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            base = Path(tmp)
++            current = base / "current"
++            current.mkdir()
++            (current / updater.PORTABLE_MARKER).write_text("channel=portable", encoding="utf-8")
++            (current / updater.PORTABLE_HELPER).write_bytes(b"helper")
++            payload = b"zip-placeholder"
++            info = update_info(updater.CHANNEL_PORTABLE, payload)
++            archive = base / info.asset_name
++            with zipfile.ZipFile(archive, "w") as zf:
++                zf.writestr("Pasajes Accesibles CNRT/.portable", "channel=portable\nversion=1.2.15")
++                zf.writestr("Pasajes Accesibles CNRT/Pasajes Accesibles CNRT.exe", b"exe")
++                zf.writestr("Pasajes Accesibles CNRT/PasajesPortableUpdater.exe", b"helper2")
++                zf.writestr("Pasajes Accesibles CNRT/.portable-manifest.json",
++                            json.dumps({"version": "1.2.15", "files": [
++                                ".portable", "Pasajes Accesibles CNRT.exe", "PasajesPortableUpdater.exe", "_internal/example.txt"
++                            ]}))
++                zf.writestr("Pasajes Accesibles CNRT/_internal/example.txt", b"x")
++            service = updater.GitHubUpdateService("example/repo", channel=updater.CHANNEL_PORTABLE)
++            prepared = service.prepare_portable_update(archive, info, portable_dir=current)
++            try:
++                self.assertEqual(prepared.portable_root, current.resolve())
++                self.assertEqual(prepared.staging_root.parent, current.parent.resolve())
++                self.assertEqual((prepared.staging_root / "_internal" / "example.txt").read_bytes(), b"x")
++            finally:
++                import shutil
++                shutil.rmtree(prepared.staging_root, ignore_errors=True)
++
++    def test_prepare_portable_update_rejects_zip_path_traversal(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            base = Path(tmp)
++            current = base / "current"
++            current.mkdir()
++            (current / updater.PORTABLE_MARKER).write_text("channel=portable", encoding="utf-8")
++            (current / updater.PORTABLE_HELPER).write_bytes(b"helper")
++            info = update_info(updater.CHANNEL_PORTABLE, b"zip-placeholder")
++            archive = base / info.asset_name
++            with zipfile.ZipFile(archive, "w") as zf:
++                zf.writestr("Pasajes Accesibles CNRT/.portable", "channel=portable")
++                zf.writestr("Pasajes Accesibles CNRT/../escape.txt", b"bad")
++            service = updater.GitHubUpdateService("example/repo", channel=updater.CHANNEL_PORTABLE)
++            with self.assertRaises(updater.UpdateError):
++                service.prepare_portable_update(archive, info, portable_dir=current)
++            self.assertFalse((base / "escape.txt").exists())
++
++    def test_prepare_portable_update_rejects_duplicate_files_case_insensitively(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            base = Path(tmp)
++            current = base / "current"
++            current.mkdir()
++            (current / updater.PORTABLE_MARKER).write_text("channel=portable", encoding="utf-8")
++            (current / updater.PORTABLE_HELPER).write_bytes(b"helper")
++            info = update_info(updater.CHANNEL_PORTABLE, b"zip-placeholder")
++            archive = base / info.asset_name
++            with zipfile.ZipFile(archive, "w") as zf:
++                zf.writestr("Root/.portable", "channel=portable")
++                zf.writestr("Root/Pasajes Accesibles CNRT.exe", b"exe")
++                zf.writestr("Root/PasajesPortableUpdater.exe", b"helper")
++                zf.writestr("Root/.portable-manifest.json", json.dumps({"files": [
++                    ".portable", "Pasajes Accesibles CNRT.exe", "PasajesPortableUpdater.exe", "Test.txt", "test.TXT"
++                ]}))
++                zf.writestr("Root/Test.txt", b"1")
++                zf.writestr("Root/test.TXT", b"2")
++            service = updater.GitHubUpdateService("example/repo", channel=updater.CHANNEL_PORTABLE)
++            with self.assertRaises(updater.UpdateError):
++                service.prepare_portable_update(archive, info, portable_dir=current)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff -ruN '--exclude=__pycache__' pa_orig_1213/Pasajes_Accesibles_CNRT/tools/write_portable_manifest.py pa_portable_1214/Pasajes_Accesibles_CNRT/tools/write_portable_manifest.py
+--- pa_orig_1213/Pasajes_Accesibles_CNRT/tools/write_portable_manifest.py	1970-01-01 00:00:00.000000000 +0000
++++ pa_portable_1214/Pasajes_Accesibles_CNRT/tools/write_portable_manifest.py	2026-10-07 22:18:12.595948325 +0000
+@@ -0,0 +1,35 @@
++from __future__ import annotations
++
++import argparse
++import json
++from pathlib import Path
++
++MANIFEST_NAME = ".portable-manifest.json"
++
++
++def build_manifest(root: Path, version: str) -> dict:
++    root = root.resolve()
++    files = []
++    for path in sorted(root.rglob("*"), key=lambda p: p.as_posix().casefold()):
++        if not path.is_file() or path.name == MANIFEST_NAME:
++            continue
++        files.append(path.relative_to(root).as_posix())
++    return {"version": version, "files": files}
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("root")
++    parser.add_argument("--version", required=True)
++    args = parser.parse_args()
++    root = Path(args.root)
++    manifest = build_manifest(root, args.version)
++    (root / MANIFEST_NAME).write_text(
++        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
++        encoding="utf-8",
++    )
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

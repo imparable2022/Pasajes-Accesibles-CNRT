@@ -1,0 +1,10 @@
+Pasajes Accesibles CNRT 1.2.14 — validación previa al release
+
+- Pruebas automáticas: 79/79 correctas.
+- Compilación estática con compileall: correcta.
+- Auditor wxPython: 0 hallazgos dirigidos.
+- Canal instalable y canal portable separados por contrato.
+- ZIP portable: validación de SHA-256, estructura, rutas, symlinks y duplicados.
+- Reemplazo portable: rollback probado y preservación de archivos ajenos al programa mediante manifiesto.
+- Revisión RDD aplicada: Risk, Readability, Reliability y Resilience.
+- Pendiente de validación de runtime Windows: build de PyInstaller/Inno Setup, ejecución del helper, SmartScreen/NVDA y actualización real entre dos releases.

@@ -31,11 +31,16 @@ Aplicación de escritorio para Windows orientada a personas usuarias de lectores
 
 ## Distribución como ejecutable
 
-El repositorio incluye una compilación para Windows basada en PyInstaller e Inno Setup. Al publicar un tag con formato `vX.Y.Z`, el workflow `.github/workflows/release.yml` valida que el tag coincida con `__version__`, ejecuta las pruebas, compila el programa, incluye Chromium de Playwright y publica en GitHub Releases un instalador llamado `Pasajes_Accesibles_CNRT_Setup_vX.Y.Z.exe` junto con su SHA-256.
+El repositorio incluye una compilación para Windows basada en PyInstaller e Inno Setup. Al publicar un tag con formato `vX.Y.Z`, el workflow `.github/workflows/release.yml` valida que el tag coincida con `__version__`, ejecuta las pruebas, compila el programa e incluye Chromium de Playwright. Cada GitHub Release publica dos formatos, ambos con su SHA-256:
 
-La persona usuaria instala ese `.exe` en `%LOCALAPPDATA%\Programs\Pasajes Accesibles CNRT`. Las preferencias, credenciales protegidas y demás datos de usuario permanecen en `%APPDATA%\Pasajes Accesibles CNRT`, por lo que una actualización del programa no los elimina.
+- `Pasajes_Accesibles_CNRT_Setup_vX.Y.Z.exe`: instalador por usuario.
+- `Pasajes_Accesibles_CNRT_Portable_vX.Y.Z.zip`: versión portable autocontenida, que se ejecuta después de descomprimirla y no necesita instalación.
 
-Para construirlo manualmente en Windows, defina `GITHUB_REPOSITORY=usuario/repositorio` y ejecute `build\build_exe.bat`. Se requiere Inno Setup 6 para crear el instalador final.
+La versión instalada se guarda en `%LOCALAPPDATA%\Programs\Pasajes Accesibles CNRT`. La versión portable permanece en la carpeta donde la persona la descomprima. En ambos casos, las preferencias, credenciales protegidas y demás datos de usuario se guardan en `%APPDATA%\Pasajes Accesibles CNRT`, por lo que actualizar o reemplazar la carpeta del programa no los elimina.
+
+El actualizador detecta automáticamente el canal. La versión instalada descarga el siguiente Setup; la versión portable descarga el siguiente ZIP portable, valida SHA-256 y la estructura del paquete, cierra la aplicación y usa un auxiliar independiente para reemplazar la carpeta. El portable incluye un manifiesto de archivos administrados para conservar archivos que la persona haya agregado por su cuenta dentro de esa carpeta.
+
+Se requiere Inno Setup 6 para crear el instalador final; el workflow de GitHub Actions realiza todo el empaquetado automáticamente.
 
 ## Instalación desde el código fuente
 
@@ -306,3 +311,14 @@ WCAG 3.0 sigue siendo un borrador y no se declara conformidad con un estándar t
 - Se añadieron PyInstaller, un script de Inno Setup y un workflow de GitHub Actions para construir el ejecutable, incluir Chromium de Playwright, generar el instalador y adjuntarlo a GitHub Releases al publicar un tag `vX.Y.Z`.
 - El repositorio de actualizaciones se inyecta automáticamente durante la compilación oficial mediante `${{ github.repository }}`; el código fuente no necesita conocer de antemano el usuario o nombre definitivo del repositorio.
 - La consulta de actualizaciones es independiente de la telemetría de PostHog y no envía datos de CNRT ni datos de reservas.
+
+
+## Cambios de la versión 1.2.14
+
+- Se añadió distribución portable oficial en cada GitHub Release, además del instalador tradicional.
+- El portable incluye el ejecutable, dependencias y Chromium de Playwright; no requiere Python ni instalación.
+- El actualizador distingue automáticamente entre instalación y portable y descarga el formato correspondiente.
+- Las actualizaciones portable verifican SHA-256, validan las rutas del ZIP y rechazan enlaces simbólicos, duplicados y paquetes con estructura inesperada.
+- Un actualizador auxiliar independiente espera a que cierre la aplicación, reemplaza la carpeta y vuelve a abrir la nueva versión.
+- El reemplazo mantiene una copia anterior durante la operación y vuelve a ella si no logra activar o iniciar la nueva versión.
+- Se añadió un manifiesto portable para preservar archivos ajenos al programa que la persona haya guardado dentro de su carpeta.

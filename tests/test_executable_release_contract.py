@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ExecutableReleaseContractTests(unittest.TestCase):
-    def test_release_workflow_builds_windows_installer_and_checksum(self):
+    def test_release_workflow_builds_installer_portable_and_checksums(self):
         workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         self.assertIn('runs-on: windows-2025', workflow)
         self.assertIn('persist-credentials: false', workflow)
@@ -16,9 +16,14 @@ class ExecutableReleaseContractTests(unittest.TestCase):
         self.assertIn('Verify injected update repository', workflow)
         self.assertIn('python -m playwright install chromium', workflow)
         self.assertIn('Inno Setup 6', workflow)
+        self.assertIn('Build portable updater helper', workflow)
+        self.assertIn('PasajesPortableUpdater.exe', workflow)
+        self.assertIn('Pasajes_Accesibles_CNRT_Portable_v$version.zip', workflow)
+        self.assertIn('channel=portable', workflow)
+        self.assertIn('write_portable_manifest.py', workflow)
         self.assertIn('Get-FileHash', workflow)
         self.assertIn('python -m unittest discover -s tests -q', workflow)
-        self.assertIn('python -m compileall -q pasajes_accesibles_cnrt launcher.py tools', workflow)
+        self.assertIn('python -m compileall -q pasajes_accesibles_cnrt launcher.py portable_updater.py tools', workflow)
         self.assertIn('gh release create', workflow)
 
     def test_installer_is_per_user_and_preserves_appdata(self):
@@ -34,6 +39,13 @@ class ExecutableReleaseContractTests(unittest.TestCase):
         self.assertIn('Path(sys.executable).resolve().parent / "ms-playwright"', client)
         self.assertIn('PLAYWRIGHT_BROWSERS_PATH', client)
 
+    def test_portable_helper_is_separate_from_main_executable(self):
+        helper = (ROOT / "portable_updater.py").read_text(encoding="utf-8")
+        self.assertIn('os.replace(target, backup)', helper)
+        self.assertIn('os.replace(source, target)', helper)
+        self.assertIn('os.replace(backup, target)', helper)
+        self.assertIn('PORTABLE_MARKER', helper)
+
     def test_update_menu_and_automatic_check_are_exposed(self):
         app = (ROOT / "pasajes_accesibles_cnrt" / "app.py").read_text(encoding="utf-8")
         self.assertIn('"&Buscar actualizaciones..."', app)
@@ -42,6 +54,8 @@ class ExecutableReleaseContractTests(unittest.TestCase):
         self.assertIn('self._initialize_telemetry_consent()\n        wx.CallLater(2500, self._auto_check_updates)', app)
         self.assertIn('24 * 60 * 60', app)
         self.assertIn('SHA-256', app)
+        self.assertIn('prepare_portable_update', app)
+        self.assertIn('launch_portable_update', app)
 
     def test_automatic_update_check_prompts_when_a_new_version_exists(self):
         app = (ROOT / "pasajes_accesibles_cnrt" / "app.py").read_text(encoding="utf-8")
@@ -50,7 +64,6 @@ class ExecutableReleaseContractTests(unittest.TestCase):
         self.assertIn('wx.YES_NO | wx.NO_DEFAULT | wx.ICON_INFORMATION', app)
         self.assertNotIn('La comprobación automática nunca abre ventanas ni roba el foco.', app)
         self.assertNotIn('Para verla, abra Ayuda y elija Buscar actualizaciones.', app)
-
 
 
 if __name__ == "__main__":

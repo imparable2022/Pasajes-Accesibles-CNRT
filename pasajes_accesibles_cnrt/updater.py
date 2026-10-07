@@ -4,10 +4,15 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import stat
 import subprocess
+import sys
 import tempfile
+import uuid
+import zipfile
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -18,7 +23,16 @@ from .storage import APP_DIR
 
 GITHUB_API = "https://api.github.com"
 INSTALLER_PREFIX = "Pasajes_Accesibles_CNRT_Setup_v"
-MAX_INSTALLER_BYTES = 900 * 1024 * 1024
+PORTABLE_PREFIX = "Pasajes_Accesibles_CNRT_Portable_v"
+PORTABLE_MARKER = ".portable"
+PORTABLE_HELPER = "PasajesPortableUpdater.exe"
+PORTABLE_MANIFEST = ".portable-manifest.json"
+APP_EXECUTABLE = "Pasajes Accesibles CNRT.exe"
+CHANNEL_INSTALLER = "installer"
+CHANNEL_PORTABLE = "portable"
+MAX_UPDATE_BYTES = 1200 * 1024 * 1024
+MAX_PORTABLE_UNPACKED_BYTES = 2500 * 1024 * 1024
+MAX_PORTABLE_MEMBERS = 25000
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?$")
@@ -34,10 +48,18 @@ class UpdateInfo:
     tag: str
     release_url: str
     notes: str
-    installer_name: str
-    installer_url: str
-    installer_size: int
+    channel: str
+    asset_name: str
+    asset_url: str
+    asset_size: int
     sha256: str
+
+
+@dataclass(frozen=True)
+class PortablePreparedUpdate:
+    version: str
+    staging_root: Path
+    portable_root: Path
 
 
 def _version_tuple(value: str) -> tuple[int, int, int]:
@@ -58,6 +80,17 @@ def configured_repository() -> str:
     official = GITHUB_REPOSITORY.strip()
     value = official or os.getenv("PASAJES_CNRT_UPDATE_REPOSITORY", "").strip()
     return value if REPOSITORY_RE.fullmatch(value) else ""
+
+
+def portable_root() -> Path | None:
+    if not getattr(sys, "frozen", False):
+        return None
+    root = Path(sys.executable).resolve().parent
+    return root if (root / PORTABLE_MARKER).is_file() else None
+
+
+def detect_update_channel() -> str:
+    return CHANNEL_PORTABLE if portable_root() is not None else CHANNEL_INSTALLER
 
 
 def _request_json(url: str, timeout: float = 15.0) -> dict:
@@ -102,7 +135,7 @@ def _asset_sha256(asset: dict) -> str:
     return ""
 
 
-def _fetch_checksum_asset(url: str, installer_name: str, repository: str, tag: str, timeout: float) -> str:
+def _fetch_checksum_asset(url: str, repository: str, tag: str, timeout: float) -> str:
     prefix = _safe_release_download_prefix(repository, tag)
     if not url.startswith(prefix) or not url.startswith("https://"):
         raise UpdateError("La URL del archivo de comprobación no pertenece al release esperado.")
@@ -118,11 +151,44 @@ def _fetch_checksum_asset(url: str, installer_name: str, repository: str, tag: s
     return first.lower()
 
 
+def _expected_asset_name(version: str, channel: str) -> str:
+    if channel == CHANNEL_PORTABLE:
+        return f"{PORTABLE_PREFIX}{version}.zip"
+    if channel == CHANNEL_INSTALLER:
+        return f"{INSTALLER_PREFIX}{version}.exe"
+    raise UpdateError("El canal de actualización no es válido.")
+
+
+def _safe_zip_path(name: str) -> PurePosixPath:
+    if not name or "\\" in name or "\x00" in name:
+        raise UpdateError("El paquete portable contiene una ruta no válida.")
+    path = PurePosixPath(name)
+    if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
+        raise UpdateError("El paquete portable contiene una ruta insegura.")
+    if any(":" in part for part in path.parts):
+        raise UpdateError("El paquete portable contiene una ruta incompatible con Windows.")
+    return path
+
+
+def _zip_member_is_symlink(member: zipfile.ZipInfo) -> bool:
+    mode = (member.external_attr >> 16) & 0o170000
+    return mode == stat.S_IFLNK
+
+
 class GitHubUpdateService:
-    def __init__(self, repository: str | None = None, current_version: str = __version__, timeout: float = 15.0):
+    def __init__(
+        self,
+        repository: str | None = None,
+        current_version: str = __version__,
+        timeout: float = 15.0,
+        channel: str | None = None,
+    ):
         self.repository = (repository or configured_repository()).strip()
         self.current_version = current_version
         self.timeout = timeout
+        self.channel = channel or detect_update_channel()
+        if self.channel not in (CHANNEL_INSTALLER, CHANNEL_PORTABLE):
+            raise ValueError(f"Canal de actualización no válido: {self.channel!r}")
 
     @property
     def configured(self) -> bool:
@@ -146,33 +212,33 @@ class GitHubUpdateService:
         if not is_newer_version(version, self.current_version):
             return None
 
-        installer_name = f"{INSTALLER_PREFIX}{version}.exe"
+        asset_name = _expected_asset_name(version, self.channel)
         assets = data.get("assets") or []
         if not isinstance(assets, list):
             raise UpdateError("GitHub no devolvió una lista válida de archivos del release.")
-        installer = next((a for a in assets if isinstance(a, dict) and a.get("name") == installer_name), None)
-        if installer is None:
-            raise UpdateError(f"La versión {version} no contiene el instalador esperado {installer_name}.")
-        installer_url = str(installer.get("browser_download_url") or "")
+        asset = next((a for a in assets if isinstance(a, dict) and a.get("name") == asset_name), None)
+        if asset is None:
+            label = "portable" if self.channel == CHANNEL_PORTABLE else "instalador"
+            raise UpdateError(f"La versión {version} no contiene el {label} esperado {asset_name}.")
+        asset_url = str(asset.get("browser_download_url") or "")
         prefix = _safe_release_download_prefix(self.repository, tag)
-        if not installer_url.startswith(prefix) or not installer_url.startswith("https://"):
-            raise UpdateError("La URL del instalador no pertenece al release esperado.")
+        if not asset_url.startswith(prefix) or not asset_url.startswith("https://"):
+            raise UpdateError("La URL de la actualización no pertenece al release esperado.")
         try:
-            installer_size = int(installer.get("size") or 0)
+            asset_size = int(asset.get("size") or 0)
         except (TypeError, ValueError):
-            installer_size = 0
-        if installer_size <= 0 or installer_size > MAX_INSTALLER_BYTES:
-            raise UpdateError("El tamaño publicado del instalador no es válido.")
+            asset_size = 0
+        if asset_size <= 0 or asset_size > MAX_UPDATE_BYTES:
+            raise UpdateError("El tamaño publicado de la actualización no es válido.")
 
-        sha256 = _asset_sha256(installer)
+        sha256 = _asset_sha256(asset)
         if not sha256:
-            checksum_name = installer_name + ".sha256"
+            checksum_name = asset_name + ".sha256"
             checksum = next((a for a in assets if isinstance(a, dict) and a.get("name") == checksum_name), None)
             if checksum is None:
-                raise UpdateError("El release no publica un SHA-256 verificable para el instalador.")
+                raise UpdateError("El release no publica un SHA-256 verificable para esta actualización.")
             sha256 = _fetch_checksum_asset(
                 str(checksum.get("browser_download_url") or ""),
-                installer_name,
                 self.repository,
                 tag,
                 self.timeout,
@@ -187,23 +253,26 @@ class GitHubUpdateService:
             tag=tag,
             release_url=release_url,
             notes=notes,
-            installer_name=installer_name,
-            installer_url=installer_url,
-            installer_size=installer_size,
+            channel=self.channel,
+            asset_name=asset_name,
+            asset_url=asset_url,
+            asset_size=asset_size,
             sha256=sha256,
         )
 
     def download(self, info: UpdateInfo, progress: Callable[[int, int], None] | None = None) -> Path:
+        if info.channel != self.channel:
+            raise UpdateError("La actualización descargada pertenece a otro canal de distribución.")
         updates_dir = APP_DIR / "updates"
         updates_dir.mkdir(parents=True, exist_ok=True)
-        destination = updates_dir / info.installer_name
+        destination = updates_dir / info.asset_name
         part = destination.with_suffix(destination.suffix + ".part")
         try:
             part.unlink(missing_ok=True)
         except TypeError:  # Python 3.10 compatibility
             if part.exists():
                 part.unlink()
-        request = Request(info.installer_url, headers={"User-Agent": f"Pasajes-Accesibles-CNRT/{__version__}"})
+        request = Request(info.asset_url, headers={"User-Agent": f"Pasajes-Accesibles-CNRT/{__version__}"})
         digest = hashlib.sha256()
         written = 0
         try:
@@ -213,12 +282,12 @@ class GitHubUpdateService:
                     if not chunk:
                         break
                     written += len(chunk)
-                    if written > MAX_INSTALLER_BYTES or written > info.installer_size + 1024:
-                        raise UpdateError("La descarga excedió el tamaño publicado para el instalador.")
+                    if written > MAX_UPDATE_BYTES or written > info.asset_size + 1024:
+                        raise UpdateError("La descarga excedió el tamaño publicado para la actualización.")
                     digest.update(chunk)
                     handle.write(chunk)
                     if progress:
-                        progress(written, info.installer_size)
+                        progress(written, info.asset_size)
         except UpdateError:
             part.unlink(missing_ok=True)
             raise
@@ -226,13 +295,13 @@ class GitHubUpdateService:
             part.unlink(missing_ok=True)
             raise UpdateError("La descarga de la actualización no pudo completarse.") from exc
 
-        if written != info.installer_size:
+        if written != info.asset_size:
             part.unlink(missing_ok=True)
-            raise UpdateError("El instalador descargado no tiene el tamaño publicado por GitHub.")
+            raise UpdateError("La actualización descargada no tiene el tamaño publicado por GitHub.")
         actual = digest.hexdigest().lower()
         if actual != info.sha256.lower():
             part.unlink(missing_ok=True)
-            raise UpdateError("El SHA-256 del instalador no coincide. La actualización fue descartada.")
+            raise UpdateError("El SHA-256 de la actualización no coincide. La descarga fue descartada.")
         os.replace(part, destination)
         return destination
 
@@ -251,3 +320,129 @@ class GitHubUpdateService:
             )
         except OSError as exc:
             raise UpdateError("Windows no pudo abrir el instalador descargado.") from exc
+
+    def prepare_portable_update(
+        self,
+        archive: Path,
+        info: UpdateInfo,
+        portable_dir: Path | None = None,
+    ) -> PortablePreparedUpdate:
+        if info.channel != CHANNEL_PORTABLE or self.channel != CHANNEL_PORTABLE:
+            raise UpdateError("Este paquete no corresponde al canal portable.")
+        archive = Path(archive).resolve()
+        if archive.suffix.lower() != ".zip" or archive.name != info.asset_name:
+            raise UpdateError("El archivo descargado no tiene el nombre del paquete portable esperado.")
+        root = Path(portable_dir).resolve() if portable_dir is not None else portable_root()
+        if root is None or not (root / PORTABLE_MARKER).is_file():
+            raise UpdateError("No se pudo identificar una instalación portable válida.")
+        if not (root / PORTABLE_HELPER).is_file():
+            raise UpdateError("La versión portable actual no contiene su actualizador auxiliar.")
+
+        staging = Path(
+            tempfile.mkdtemp(
+                prefix=f".Pasajes_Accesibles_CNRT_update_{info.version}_{uuid.uuid4().hex[:8]}_",
+                dir=str(root.parent),
+            )
+        ).resolve()
+        try:
+            with zipfile.ZipFile(archive, "r") as zf:
+                members = zf.infolist()
+                if not members or len(members) > MAX_PORTABLE_MEMBERS:
+                    raise UpdateError("El paquete portable tiene una cantidad de archivos no válida.")
+                total_unpacked = sum(max(0, int(member.file_size)) for member in members)
+                if total_unpacked > MAX_PORTABLE_UNPACKED_BYTES:
+                    raise UpdateError("El paquete portable excede el tamaño máximo permitido al descomprimirse.")
+
+                parsed: list[tuple[zipfile.ZipInfo, PurePosixPath]] = []
+                roots: set[str] = set()
+                relative_names: set[str] = set()
+                for member in members:
+                    path = _safe_zip_path(member.filename.rstrip("/"))
+                    if _zip_member_is_symlink(member):
+                        raise UpdateError("El paquete portable contiene un enlace simbólico no permitido.")
+                    roots.add(path.parts[0])
+                    if len(path.parts) == 1:
+                        continue
+                    relative = PurePosixPath(*path.parts[1:])
+                    key = relative.as_posix().casefold()
+                    if key in relative_names and not member.is_dir():
+                        raise UpdateError("El paquete portable contiene archivos duplicados.")
+                    relative_names.add(key)
+                    parsed.append((member, relative))
+                if len(roots) != 1:
+                    raise UpdateError("El paquete portable debe contener una única carpeta raíz.")
+
+                for member, relative in parsed:
+                    destination = staging.joinpath(*relative.parts)
+                    if member.is_dir():
+                        destination.mkdir(parents=True, exist_ok=True)
+                        continue
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    resolved_parent = destination.parent.resolve()
+                    if os.path.commonpath([str(staging), str(resolved_parent)]) != str(staging):
+                        raise UpdateError("El paquete portable intentó escribir fuera de su carpeta temporal.")
+                    with zf.open(member, "r") as source, destination.open("wb") as target:
+                        shutil.copyfileobj(source, target, length=1024 * 1024)
+
+            required = [
+                staging / PORTABLE_MARKER,
+                staging / PORTABLE_MANIFEST,
+                staging / APP_EXECUTABLE,
+                staging / PORTABLE_HELPER,
+            ]
+            if not all(path.is_file() for path in required):
+                raise UpdateError("El paquete portable no contiene todos los archivos requeridos.")
+            marker = (staging / PORTABLE_MARKER).read_text(encoding="utf-8", errors="replace")
+            if "channel=portable" not in marker:
+                raise UpdateError("El paquete descargado no está marcado como versión portable.")
+            try:
+                manifest = json.loads((staging / PORTABLE_MANIFEST).read_text(encoding="utf-8"))
+                managed = manifest.get("files") if isinstance(manifest, dict) else None
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise UpdateError("El manifiesto del paquete portable no es válido.") from exc
+            if not isinstance(managed, list) or not all(isinstance(item, str) and item for item in managed):
+                raise UpdateError("El manifiesto del paquete portable no contiene una lista válida de archivos.")
+            required_names = {PORTABLE_MARKER, APP_EXECUTABLE, PORTABLE_HELPER}
+            if not required_names.issubset({item.replace("\\", "/") for item in managed}):
+                raise UpdateError("El manifiesto portable no declara los archivos esenciales del programa.")
+            return PortablePreparedUpdate(info.version, staging, root)
+        except Exception:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
+
+    @staticmethod
+    def launch_portable_update(prepared: PortablePreparedUpdate) -> None:
+        if os.name != "nt":
+            raise UpdateError("La actualización portable automática solo está disponible en Windows.")
+        root = prepared.portable_root.resolve()
+        staging = prepared.staging_root.resolve()
+        if staging.parent != root.parent:
+            raise UpdateError("La carpeta temporal portable no está en la ubicación esperada.")
+        if not (root / PORTABLE_MARKER).is_file() or not (staging / PORTABLE_MARKER).is_file():
+            raise UpdateError("No se pudo validar la carpeta portable antes de actualizar.")
+        source_helper = root / PORTABLE_HELPER
+        if not source_helper.is_file():
+            raise UpdateError("No se encontró el actualizador auxiliar de la versión portable.")
+
+        helper_dir = APP_DIR / "updates"
+        helper_dir.mkdir(parents=True, exist_ok=True)
+        helper_copy = helper_dir / f"PasajesPortableUpdater-{prepared.version}.exe"
+        try:
+            shutil.copy2(source_helper, helper_copy)
+            subprocess.Popen(
+                [
+                    str(helper_copy),
+                    "--wait-pid",
+                    str(os.getpid()),
+                    "--source",
+                    str(staging),
+                    "--target",
+                    str(root),
+                    "--app",
+                    APP_EXECUTABLE,
+                ],
+                cwd=str(helper_dir),
+                close_fds=True,
+            )
+        except OSError as exc:
+            raise UpdateError("Windows no pudo iniciar el actualizador portable auxiliar.") from exc

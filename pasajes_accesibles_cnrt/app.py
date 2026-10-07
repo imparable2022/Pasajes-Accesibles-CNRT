@@ -349,8 +349,9 @@ class MainFrame(wx.Frame):
         )
         if notes:
             message += f"Cambios publicados:\n{notes}\n\n"
+        package_label = "paquete portable" if info.channel == "portable" else "instalador"
         message += (
-            "¿Querés descargarla ahora? El instalador se verificará mediante SHA-256 antes de abrirse."
+            f"¿Querés descargarla ahora? El {package_label} se verificará mediante SHA-256 antes de aplicarse."
         )
         answer = wx.MessageBox(
             message,
@@ -374,6 +375,8 @@ class MainFrame(wx.Frame):
             error = None
             try:
                 path = self.update_service.download(info)
+                if info.channel == "portable":
+                    path = self.update_service.prepare_portable_update(path, info)
             except Exception as exc:
                 error = exc
             wx.CallAfter(self._finish_update_download, info, path, error)
@@ -387,25 +390,44 @@ class MainFrame(wx.Frame):
             wx.MessageBox(detail, "Actualización", wx.OK | wx.ICON_ERROR, self)
             self._announce("La actualización no pudo descargarse o verificarse.")
             return
+        portable = info.channel == "portable"
+        if portable:
+            action_text = (
+                "Al continuar, esta ventana se cerrará y un actualizador auxiliar reemplazará "
+                "la carpeta portable por la nueva versión. Después volverá a abrir el programa. "
+                "Tus preferencias y datos guardados en AppData no se eliminan.\n\n"
+                "¿Actualizar ahora?"
+            )
+            title = "Actualización portable lista"
+        else:
+            action_text = (
+                "Al continuar se abrirá el instalador y esta ventana se cerrará. "
+                "Tus preferencias y datos guardados en AppData no se eliminan.\n\n"
+                "¿Instalar ahora?"
+            )
+            title = "Actualización lista para instalar"
         answer = wx.MessageBox(
             f"Pasajes Accesibles CNRT {info.version} se descargó y su SHA-256 fue verificado.\n\n"
-            "Al continuar se abrirá el instalador y esta ventana se cerrará. "
-            "Tus preferencias y datos guardados en AppData no se eliminan.\n\n"
-            "¿Instalar ahora?",
-            "Actualización lista para instalar",
+            + action_text,
+            title,
             wx.YES_NO | wx.NO_DEFAULT | wx.ICON_INFORMATION,
             self,
         )
         if answer != wx.YES:
-            self._announce(f"Actualización {info.version} descargada. Instalación pospuesta.")
+            self._announce(f"Actualización {info.version} descargada. Aplicación pospuesta.")
             return
         try:
-            self.update_service.launch_installer(path)
+            if portable:
+                self.update_service.launch_portable_update(path)
+            else:
+                self.update_service.launch_installer(path)
         except UpdateError as exc:
             wx.MessageBox(str(exc), "Actualización", wx.OK | wx.ICON_ERROR, self)
-            self._announce("Windows no pudo abrir el instalador de la actualización.")
+            self._announce("Windows no pudo iniciar la aplicación de la actualización.")
             return
-        self._announce("Abriendo el instalador de la actualización.")
+        self._announce(
+            "Aplicando la actualización portable." if portable else "Abriendo el instalador de la actualización."
+        )
         wx.CallAfter(self.Close)
 
     @staticmethod

@@ -36,7 +36,7 @@ jobs:
         run: python -m unittest discover -s tests -q
 
       - name: Compile Python sources
-        run: python -m compileall -q pasajes_accesibles_cnrt launcher.py tools
+        run: python -m compileall -q pasajes_accesibles_cnrt launcher.py portable_updater.py tools
 
       - name: Inject update repository
         run: python tools/generate_build_info.py --repository "${{ github.repository }}"
@@ -58,6 +58,15 @@ jobs:
       - name: Build application
         run: pyinstaller --noconfirm PasajesAccesiblesCNRT.spec
 
+      - name: Build portable updater helper
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --name PasajesPortableUpdater `
+            --distpath build\portable-helper `
+            --workpath build\portable-helper-work `
+            --specpath build\portable-helper-spec `
+            portable_updater.py
+
       - name: Build installer
         shell: pwsh
         run: |
@@ -68,13 +77,34 @@ jobs:
           $version = "${{ github.ref_name }}".TrimStart('v')
           & $iscc "/DAppVersion=$version" "/DBuildRoot=${{ github.workspace }}\dist\Pasajes Accesibles CNRT" "/DBrowserRoot=${{ github.workspace }}\build\ms-playwright" installer\PasajesAccesiblesCNRT.iss
 
+      - name: Build portable package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $portableParent = "release\portable"
+          $portableRoot = "$portableParent\Pasajes Accesibles CNRT"
+          Remove-Item $portableParent -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $portableRoot | Out-Null
+          Copy-Item "dist\Pasajes Accesibles CNRT\*" $portableRoot -Recurse -Force
+          Copy-Item "build\ms-playwright" "$portableRoot\ms-playwright" -Recurse -Force
+          Copy-Item "build\portable-helper\PasajesPortableUpdater.exe" "$portableRoot\PasajesPortableUpdater.exe" -Force
+          "channel=portable`nversion=$version" | Set-Content "$portableRoot\.portable" -Encoding ascii
+          python tools\write_portable_manifest.py "$portableRoot" --version $version
+          $zip = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
+          Compress-Archive -Path $portableRoot -DestinationPath $zip -CompressionLevel Optimal -Force
+
       - name: Write SHA-256
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
-          $file = "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe"
-          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
-          "$hash  Pasajes_Accesibles_CNRT_Setup_v$version.exe" | Set-Content "$file.sha256" -Encoding ascii
+          $files = @(
+            "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe",
+            "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
+          )
+          foreach ($file in $files) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            "$hash  $(Split-Path $file -Leaf)" | Set-Content "$file.sha256" -Encoding ascii
+          }
 
       - name: Create GitHub Release
         env:
@@ -83,5 +113,8 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
           $installer = "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe"
-          $checksum = "$installer.sha256"
-          gh release create "${{ github.ref_name }}" $installer $checksum --title "Pasajes Accesibles CNRT $version" --generate-notes
+          $portable = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
+          gh release create "${{ github.ref_name }}" `
+            $installer "$installer.sha256" `
+            $portable "$portable.sha256" `
+            --title "Pasajes Accesibles CNRT $version" --generate-notes
