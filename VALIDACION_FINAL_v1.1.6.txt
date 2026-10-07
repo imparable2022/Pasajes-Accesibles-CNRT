@@ -1,0 +1,12 @@
+Pasajes Accesibles CNRT 1.1.6 — validación final
+
+Cambio de esta versión:
+- Cuando CNRT verifica correctamente una anulación, la interfaz muestra el mensaje "Reserva anulada con éxito".
+- El estado accesible anuncia: "Reserva anulada con éxito. La anulación fue verificada por CNRT."
+- Se conserva la confirmación humana previa a la anulación.
+
+Validaciones:
+- Pruebas unitarias/regresión: 16/16 PASS.
+- Compilación estática de módulos Python: PASS.
+- Integridad del ZIP final: PASS.
+- Extracción limpia y repetición de pruebas: PASS.

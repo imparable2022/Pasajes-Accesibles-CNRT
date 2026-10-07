@@ -1,0 +1,8 @@
+Pasajes Accesibles CNRT 1.1.3 — validación final
+
+Corrección principal:
+- El perfil/correo se consulta antes de preparar la reserva.
+- Después de abrir /web/confirmarReserva no se realizan navegaciones adicionales antes de la confirmación definitiva.
+- Se añadió una prueba de regresión específica para el error: “No está abierta la pantalla de confirmación de una reserva”.
+
+Validar en Windows con una cuenta autorizada antes de depender del sistema para un viaje real.

@@ -1,0 +1,13 @@
+Pasajes Accesibles CNRT v1.2.2 - validación final
+
+Cambio realizado:
+- Los tres botones de opción de "Modo de búsqueda" ahora son hijos reales del wx.StaticBox asociado al wx.StaticBoxSizer.
+- Se mantienen las mismas etiquetas, atajos Alt+S / Alt+R / Alt+E y el comportamiento de foco de v1.2.1.
+- No se modificó la lógica de búsqueda, reserva, anulación ni el flujo con CNRT.
+
+Resultados:
+- Suite completa: 24/24 pruebas OK.
+- Compilación estática de pasajes_accesibles_cnrt y tests: OK.
+- Auditor wxpython-accessible-app-development v1.2 sobre app.py: 0 hallazgos.
+- Prueba de regresión específica de parenting de los tres RadioButton: OK.
+- Integridad del ZIP final: OK.

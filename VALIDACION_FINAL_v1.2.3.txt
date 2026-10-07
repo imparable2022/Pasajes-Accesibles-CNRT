@@ -1,0 +1,14 @@
+Pasajes Accesibles CNRT v1.2.3 - validación final
+
+Cambio realizado:
+- El panel de encabezado visual ya no usa el nombre accesible genérico "Encabezado visual".
+- Cada encabezado expone a NVDA el texto real de la pantalla.
+- En el menú principal, el encabezado accesible anuncia "Reserva, consulta y gestión accesible de pasajes".
+- La marca interna usada para aplicar el tema visual quedó separada del nombre accesible.
+- No se modificaron la lógica de búsqueda, reserva, anulación, atajos ni comportamiento de foco.
+
+Resultados:
+- Suite completa: 25/25 pruebas OK.
+- Compilación estática de pasajes_accesibles_cnrt y tests: OK.
+- Auditor wxpython-accessible-app-development v1.2 sobre app.py: 0 hallazgos.
+- Prueba de regresión específica para impedir que vuelva "Encabezado visual": OK.

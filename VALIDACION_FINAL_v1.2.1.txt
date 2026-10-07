@@ -1,0 +1,28 @@
+Pasajes Accesibles CNRT v1.2.1 - validación final
+
+Objetivo de esta versión:
+Mejorar la accesibilidad visual para personas con baja visión sin modificar la lógica de CNRT ni perjudicar el uso con NVDA.
+
+Referencias aplicadas:
+- Olga Carreras: baja visión y errores habituales en modo alto contraste.
+- WCAG 2.2: ratios numéricos de contraste verificables.
+- WCAG 3.0 Editor's Draft del 2 de octubre de 2026: dirección de diseño para ajustes del usuario, texto ajustable al 200 %, foco, contraste de componentes y reflujo.
+
+Cambios comprobados:
+- Texto secundario #475569 sobre #F5F7FA: contraste superior a 4.5:1.
+- Texto blanco sobre azul #2563EB: contraste superior a 4.5:1.
+- Estados de éxito, error y aviso: contraste superior a 4.5:1 y etiqueta textual adicional.
+- Borde de referencia #64748B sobre blanco: contraste superior a 3:1.
+- Texto ajustable entre 100 % y 200 % en pasos de 25 %.
+- Preferencia de tamaño persistente entre ejecuciones.
+- Ctrl++, Ctrl+- y Ctrl+0 disponibles, además del menú Vista.
+- Contenido principal desplazable y filas horizontales relevantes con WrapSizer.
+- Botones con altura mínima de 44 píxeles lógicos y crecimiento con el texto.
+- Detección del modo de alto contraste de Windows mediante SPI_GETHIGHCONTRAST.
+- Uso de colores del sistema cuando el alto contraste está activo.
+- Reacción a cambios de colores del sistema durante la ejecución.
+- Indicador de foco nativo conservado; no se sustituye por un foco personalizado dependiente del color.
+- La lógica de búsqueda, reserva, anulación, ComboBox y foco de los modos de búsqueda permanece sin cambios funcionales deliberados.
+
+Nota:
+WCAG 3.0 todavía es un borrador. Esta validación no afirma conformidad con WCAG 3. Para contraste cuantitativo se mantiene WCAG 2.2 porque el Editor's Draft aún indica que la medida final de contraste está por determinar.

@@ -1,0 +1,16 @@
+Pasajes Accesibles CNRT v1.2.6 — validación final
+
+Cambio principal:
+- El nombre visible del programa pasó de Pasajes Accesibles CNRT a Pasajes Accesibles CNRT.
+- Se actualizaron ventana, encabezado principal, Acerca de, instalador, README y avisos de licencia.
+- Se mantienen el paquete interno pasajes_accesibles_cnrt y la ubicación histórica de datos/configuración para conservar compatibilidad con instalaciones anteriores.
+
+Validaciones:
+- 31/31 pruebas automáticas superadas.
+- Compilación estática de módulos Python correcta.
+- Auditor wxpython-accessible-app-development v1.2.3: 0 hallazgos.
+- Integridad del ZIP verificada.
+- Las referencias funcionales a CNRT se conservan donde corresponden.
+
+Nota:
+- La validación automática no sustituye la prueba real en Windows con NVDA.

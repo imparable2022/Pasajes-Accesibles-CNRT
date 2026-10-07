@@ -1,0 +1,18 @@
+Pasajes Accesibles CNRT 1.1.4 — validación final
+
+Cambios de interfaz:
+- Menú: "Buscar pasajes".
+- Origen/destino: búsqueda dinámica con Enter para pasar a resultados, flechas arriba/abajo para navegar y Enter para aceptar.
+- Fecha elegida: edición DD-MM-AAAA y selección separada por día/mes/año.
+- Flechas arriba/abajo cambian un día respetando los límites publicados por CNRT.
+- Búsqueda disponible tanto para una fecha elegida como para todas las fechas.
+- Desde/Hasta sólo se muestran al marcar "Limitar el escaneo a un rango de fechas" y ofrecen los mismos controles de fecha.
+- Respuestas tardías de búsquedas de localidad/fechas se ignoran si la pantalla ya fue cerrada.
+
+Validación automática:
+- 13 pruebas ejecutadas correctamente.
+- Incluye las 8 pruebas funcionales previas y 5 pruebas de contrato de la nueva interfaz.
+- Compilación sintáctica de app.py: correcta.
+
+Límite de validación:
+- El comportamiento de foco y lectura con NVDA debe probarse en Windows real, ya que este entorno no ejecuta NVDA ni wxPython con escritorio gráfico.

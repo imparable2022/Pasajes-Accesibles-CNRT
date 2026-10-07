@@ -1,0 +1,29 @@
+Pasajes Accesibles CNRT 1.1 - validación final
+Fecha: 2026-09-30
+
+Pruebas automáticas:
+- 7/7 PASS.
+- Escaneo de fechas: PASS.
+- Servicios disponibles: PASS.
+- Restricciones 48 horas / 30 días: PASS.
+- Confirmación de reserva: PASS.
+- Parser de Mis Solicitudes: PASS.
+- Reserva activa enlazada a Modificar Email, Modificar Preferencia y Anular: PASS.
+- Reservas históricas sin acciones inventadas: PASS.
+
+Validación contra los HTML suministrados:
+- Mis Solicitudes: 10 registros recuperados del HTML completo.
+- Primera solicitud: estado Activa y las tres acciones oficiales identificadas por su href propio.
+- Registros históricos: sin acción Anular.
+- Modificar Email: campos #email_email, #email_save y token CSRF del formulario detectados.
+- Modificar Preferencia: form#preferencia, planta baja/alta y motivoPreferencia detectados.
+
+Seguridad funcional:
+- Tokens de sesión y URLs de acciones se conservan solo en memoria.
+- La anulación requiere confirmación humana explícita.
+- El correo y la preferencia se verifican después del envío cuando CNRT permite relectura.
+- La reserva definitiva mantiene confirmación humana separada.
+
+Pendiente de validación en Windows con sesión autorizada:
+- Comportamiento real de redirecciones/mensajes del servidor después de modificar email/preferencia y anular.
+- Lectura runtime con NVDA.

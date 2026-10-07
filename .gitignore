@@ -1,0 +1,56 @@
+# Entornos virtuales y dependencias locales
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Variables de entorno y secretos locales
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Datos y bases locales
+*.sqlite
+*.sqlite3
+*.db
+*.dat
+
+# Logs, volcados y temporales
+*.log
+*.tmp
+*.temp
+*.bak
+*.dmp
+crash-*.txt
+
+# IDE / editor
+.vscode/
+.idea/
+*.code-workspace
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Distribuciones y artefactos generados
+build/
+dist/
+*.egg-info/
+*.zip
+
+release/
+build/ms-playwright/

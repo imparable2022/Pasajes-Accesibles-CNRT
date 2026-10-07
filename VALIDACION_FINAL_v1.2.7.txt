@@ -1,0 +1,16 @@
+Pasajes Accesibles CNRT v1.2.7 — validación final
+
+Cambios de identidad interna:
+- Paquete Python renombrado a pasajes_accesibles_cnrt.
+- Carpeta de datos de usuario renombrada a %APPDATA%\\Pasajes Accesibles CNRT.
+- Configuración wx.Config renombrada a Pasajes Accesibles CNRT.
+- Descripción de protección DPAPI renombrada a Pasajes Accesibles CNRT.
+- Clase principal de la aplicación y marcadores internos de interfaz actualizados al nuevo nombre.
+- Ejecutores, pruebas y documentación actualizados al nuevo nombre.
+- No se mantiene compatibilidad automática con datos/configuración guardados bajo la identidad anterior, por decisión explícita del proyecto.
+
+Comprobaciones:
+- Suite automatizada: 33/33 pruebas superadas.
+- Compilación estática de pasajes_accesibles_cnrt y tests: OK.
+- Auditor wxPython accesible v1.2.3: 0 hallazgos.
+- No quedan referencias textuales al antiguo nombre de producto ni al antiguo nombre de paquete.

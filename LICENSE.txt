@@ -1,0 +1,14 @@
+Pasajes Accesibles CNRT
+PolyForm Noncommercial License 1.0.0
+
+Official license terms:
+https://polyformproject.org/licenses/noncommercial/1.0.0
+
+Required Notice: Copyright 2026 Martín Ortiz.
+Required Notice: Pasajes Accesibles CNRT is an independent and unofficial project. It is not developed, sponsored, endorsed, or distributed by the Comisión Nacional de Regulación del Transporte (CNRT).
+
+The project code may be used, modified, and distributed only for purposes permitted by the PolyForm Noncommercial License 1.0.0.
+
+Commercial use is not granted by this license. A separate commercial permission or license would have to be granted by the copyright holder.
+
+Third-party software and dependencies keep their own licenses. See THIRD_PARTY_NOTICES.md.

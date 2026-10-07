@@ -1,0 +1,16 @@
+Pasajes Accesibles CNRT v1.1.7 - Validación final
+
+Cambios principales:
+- Tercera opción independiente: "Escanear todas las fechas disponibles" con Alt+E.
+- "Buscar fecha específica" usa Alt+S.
+- "Buscar rango de fechas" usa Alt+R.
+- Solo se muestran los controles correspondientes al modo elegido.
+- En modo de escaneo completo no se muestran controles de fecha ni rango.
+- El botón de acción pasa a "Escanear todas las fechas disponibles" y conserva Alt+F.
+- El escaneo completo utiliza automáticamente todo el período admitido por CNRT.
+- Se conservan los mensajes explícitos de reserva y anulación exitosas.
+
+Pruebas:
+- 17/17 pruebas automáticas: PASS.
+- compileall: PASS.
+- Integridad ZIP: PASS.

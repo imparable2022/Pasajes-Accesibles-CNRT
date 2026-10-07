@@ -1,0 +1,17 @@
+Pasajes Accesibles CNRT v1.2.9 - Validación final
+
+Resultado:
+- 39/39 pruebas unitarias aprobadas.
+- Compilación estática de pasajes_accesibles_cnrt y tests: correcta.
+- Auditor wxpython-accessible-app-development v1.2.3: 0 hallazgos.
+- Telemetría: desactivada por defecto si no existe project token de PostHog.
+- Consentimiento: un único diálogo Sí/No para datos técnicos, accesibilidad, viajes y ubicación aproximada.
+- Revocación: Ayuda > Privacidad y estadísticas detiene futuros envíos.
+- Separación: app_started usa UUID de instalación; reservation_completed y reservation_cancelled usan UUID aleatorio por evento y no incluyen UUID de instalación.
+- Datos personales de reserva no forman parte del módulo telemetry.py.
+- La telemetría usa un hilo daemon y descarta fallos de red para no interferir con la aplicación.
+
+Importante:
+La integración no enviará datos hasta configurar PASAJES_ACCESIBLES_CNRT_POSTHOG_TOKEN con un project token público (phc_...). No usar una personal API key (phx_...) dentro de la aplicación.
+
+La ejecución gráfica real con NVDA/JAWS/Narrador y los ajustes de accesibilidad de Windows debe verificarse en Windows.

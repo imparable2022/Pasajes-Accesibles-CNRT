@@ -1,0 +1,25 @@
+Pasajes Accesibles CNRT 1.2.13 — Validación final
+Fecha: 2026-10-07
+
+Cambio principal:
+- Preparación de distribución oficial como ejecutable/instalador de Windows.
+- Actualizaciones mediante GitHub Releases.
+- Comprobación automática una vez cada 24 horas y comprobación manual desde Ayuda.
+- Cuando existe una nueva versión, tanto la comprobación automática como la manual muestran el diálogo accesible de actualización.
+- Descarga con validación de nombre, repositorio/tag, tamaño y SHA-256.
+- Instalación mediante proceso externo para permitir reemplazar la aplicación cerrada.
+- GitHub Actions construye PyInstaller + Chromium de Playwright + instalador Inno Setup y publica release al crear un tag vX.Y.Z.
+
+Validaciones:
+- unittest: 68/68 correctas.
+- compileall: correcto.
+- Auditor wxPython accessibility patterns 1.2.3: 0 hallazgos dirigidos.
+- Workflow YAML: parseado correctamente.
+- Revisión RDD Risk/Readability/Reliability/Resilience: aprobada después de una corrección de seguridad.
+- Hallazgo RDD corregido: una variable de entorno ya no puede redirigir una compilación oficial a otro repositorio de actualizaciones.
+- Escaneo básico de secretos: sin claves privadas de PostHog, GitHub, AWS ni claves PEM; permanece únicamente el project token público phc_ de PostHog incorporado intencionalmente.
+
+Limitaciones de esta validación:
+- Este entorno no construye ni ejecuta un .exe nativo de Windows, por lo que no se afirma una prueba de ejecución real del instalador, SmartScreen, NVDA o Inno Setup aquí.
+- La construcción real queda delegada al workflow Windows de GitHub Actions y debe verificarse en el primer release del repositorio.
+- SHA-256 no reemplaza una firma Authenticode. La firma de código queda recomendada como mejora futura.

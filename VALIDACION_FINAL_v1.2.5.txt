@@ -1,0 +1,14 @@
+Pasajes Accesibles CNRT v1.2.5 — validación final
+
+Cambios:
+- Menú Ayuda accesible con Alt+Y.
+- Acerca de accesible con Alt+A y texto legal/informativo acordado.
+- Contáctate conmigo accesible con Alt+C.
+- El contacto abre mailto:martinortiz4362@gmail.com mediante el manejador predeterminado del sistema.
+- Se conserva la licencia PolyForm Noncommercial 1.0.0 y los avisos de terceros.
+
+Validaciones realizadas antes del empaquetado:
+- unittest: 29/29 PASS.
+- compileall: PASS.
+- auditor wxPython v1.2.1 sobre app.py: 0 hallazgos.
+- integridad ZIP y extracción limpia: se verifican al empaquetar.

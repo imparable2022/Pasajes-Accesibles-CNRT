@@ -1,0 +1,16 @@
+Pasajes Accesibles CNRT v1.2.8 — validación final
+
+Cambios verificados:
+- Nombre visible: Pasajes Accesibles CNRT.
+- Paquete Python: pasajes_accesibles_cnrt.
+- Carpeta de datos: %APPDATA%\Pasajes Accesibles CNRT.
+- Configuración wx.Config: Pasajes Accesibles CNRT.
+- Descripción DPAPI: Pasajes Accesibles CNRT.
+- Carpeta raíz de distribución: Pasajes_Accesibles_CNRT.
+- Cambio intencionalmente incompatible con la identidad de datos/configuración anterior.
+
+Validaciones:
+- Pruebas unitarias: 33/33 OK.
+- Compilación estática de pasajes_accesibles_cnrt y tests: OK.
+- Auditor wxPython v1.2.3: 0 hallazgos.
+- Integridad ZIP: OK.

@@ -1,0 +1,20 @@
+Pasajes Accesibles CNRT v1.1.8 - Validación final
+
+Cambio principal:
+- Origen y Destino ahora son cuadros combinados editables únicos.
+- Ya no existe una lista separada de resultados de localidades.
+- La búsqueda de localidades sigue siendo dinámica mientras se escribe.
+- Flechas arriba/abajo recorren coincidencias dentro del mismo control.
+- Enter acepta la localidad seleccionada.
+- Flechas izquierda/derecha conservan el comportamiento normal de edición de texto del ComboBox.
+- Al modificar o borrar el texto, se actualizan las coincidencias.
+
+Compatibilidad conservada:
+- Buscar fecha específica.
+- Buscar rango de fechas.
+- Escanear todas las fechas disponibles.
+- Reserva sin diálogo extra de confirmación.
+- Mensaje de reserva realizada con éxito.
+- Mensaje de reserva anulada con éxito.
+
+Pruebas automáticas: 17/17 correctas.

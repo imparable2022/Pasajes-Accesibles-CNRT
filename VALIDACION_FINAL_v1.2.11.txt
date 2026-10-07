@@ -1,0 +1,20 @@
+Pasajes Accesibles CNRT v1.2.11 - Validación final
+
+Resultado general: PASS
+
+- Tests: 49/49 PASS
+- compileall: PASS
+- Auditor wxPython accessibility skill v1.2.3: 0 hallazgos
+- Project token PostHog distribuido: configurado (phc_...)
+- Región PostHog: US Cloud
+- Host de captura: https://us.i.posthog.com
+- Consentimiento previo obligatorio: PASS
+- Telemetría desactivada => 0 eventos encolados: PASS
+- Personal API key incluida: NO
+- Nueva dependencia PostHog: NO; se usa urllib estándar
+- RDD Risk/Readability/Reliability/Resilience: PASS
+
+Limitaciones de esta validación:
+- No se envió un evento real al proyecto PostHog desde este entorno.
+- No se realizó una sesión real contra CNRT.
+- No se verificó runtime con NVDA, JAWS o Narrador.

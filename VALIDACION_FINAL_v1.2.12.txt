@@ -1,0 +1,24 @@
+PASAJES ACCESIBLES CNRT v1.2.12 - VALIDACIÓN FINAL
+
+Objetivo de esta entrega:
+- Preparar el código fuente para publicación pública en GitHub.
+- Añadir protección contra la inclusión accidental de archivos locales o secretos.
+- Documentar el modelo de seguridad del Project token público de PostHog.
+
+Cambios:
+- .gitignore añadido con exclusiones para .venv, cachés de Python, .env, logs, bases locales, volcados, certificados/claves y artefactos generados.
+- Encabezado restante del instalador actualizado a Pasajes Accesibles CNRT.
+- SECURITY.md añadido.
+- Pruebas de higiene del repositorio añadidas.
+
+Validaciones realizadas:
+- Suite unitaria completa: 53/53 pruebas correctas.
+- Compilación estática de Python: correcta.
+- Auditor de patrones wxPython/accesibilidad: 0 hallazgos dirigidos.
+- Escaneo de credenciales de alto riesgo: 0 hallazgos.
+- Claves privadas PostHog reales (phx_/phs_/pha_/phr_): ninguna.
+- Material PEM de clave privada: ninguno.
+- El único token real de PostHog incorporado es el Project token phc_ de captura, documentado como público.
+
+Nota de seguridad:
+Cifrar u ofuscar un token estático dentro de una aplicación de escritorio no lo convierte en un secreto real, porque el cliente necesita recuperarlo para usarlo. Si se necesita resistencia frente a eventos falsos, debe usarse un servicio propio con validación y límites de frecuencia antes de reenviar los eventos a PostHog.

@@ -1,0 +1,19 @@
+Pasajes Accesibles CNRT 1.1.1 — validación final
+Fecha: 2026-09-30
+
+Corrección principal:
+- instalar.bat ya no depende de que `py -3.11` exista.
+- Detecta Python 3.10/3.11/3.12 de 64 bits con py.exe, PATH y rutas locales habituales.
+- Si no hay Python compatible y winget está disponible, intenta instalar Python 3.11 para el usuario actual.
+- El entorno virtual se usa mediante `.venv\Scripts\python.exe` sin necesidad de activar el entorno.
+
+Validación funcional heredada de 1.1:
+- Parsers de servicios y confirmación: PASS.
+- Escaneo secuencial de fechas: PASS.
+- Mis Solicitudes: PASS.
+- Modificar email: PASS.
+- Modificar preferencia: PASS.
+- Anulación ligada al enlace exacto de cada reserva: PASS.
+
+Nota:
+La lógica BAT de detección/instalación de Python fue revisada estáticamente en este entorno Linux. La ejecución real del instalador requiere Windows 10/11.

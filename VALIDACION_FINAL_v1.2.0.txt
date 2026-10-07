@@ -1,0 +1,25 @@
+Pasajes Accesibles CNRT v1.2.0 - validación de entrega
+
+Objetivo de esta versión:
+- Renovación visual sin modificar la lógica de CNRT ni la accesibilidad de teclado.
+
+Tema visual:
+- Fondo general: #F5F7FA
+- Superficies: #FFFFFF
+- Texto principal: #1F2937
+- Azul principal: #2563EB
+- Azul hover: #1D4ED8
+- Verde de éxito: #15803D
+- Rojo de error/acción destructiva: #B91C1C
+- Ámbar de advertencia: #B45309
+
+Criterios de accesibilidad conservados:
+- Controles nativos wxPython.
+- Origen y Destino siguen siendo ComboBox editables.
+- Los tres modos siguen siendo RadioButton nativos.
+- El cambio de modo conserva el foco en el RadioButton seleccionado.
+- El estado siempre conserva texto; el color es solo un refuerzo visual.
+- La confirmación final de reserva no añade un segundo diálogo Sí/No.
+- La anulación conserva la confirmación previa.
+
+Pruebas: ejecutar `python -m unittest discover -s tests -q`.

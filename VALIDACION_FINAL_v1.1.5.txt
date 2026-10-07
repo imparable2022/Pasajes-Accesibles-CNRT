@@ -1,0 +1,23 @@
+Pasajes Accesibles CNRT 1.1.5 — validación final
+
+Cambios de interfaz:
+- Buscar pasajes usa dos botones de opción excluyentes.
+- "Buscar fecha específica" usa Alt+E.
+- "Buscar rango de fechas" usa Alt+R.
+- Solo se muestran los controles de fecha del modo seleccionado.
+- El botón de ejecución cambia entre "Buscar fecha" y "Buscar fechas" y usa Alt+F en ambos modos.
+- Fecha, Desde y Hasta conservan edición DD-MM-AAAA, flechas arriba/abajo y cuadros combinados Día/Mes/Año.
+- El rango inicial va desde la primera fecha admitida por CNRT hasta el día siguiente, sin superar el máximo permitido.
+
+Reserva:
+- Se eliminó el diálogo adicional Sí/No antes de enviar la solicitud definitiva.
+- El envío sigue requiriendo pulsar explícitamente el botón final de la pantalla de revisión.
+- Cuando CNRT confirma la solicitud se muestra un mensaje accesible "Reserva realizada con éxito", además de registrarse en Estado.
+
+Validación automática:
+- 15 pruebas ejecutadas correctamente.
+- Incluye parsers, Mis solicitudes, escáner, regresión del flujo de reserva y contrato de interfaz.
+- Compilación sintáctica de app.py: correcta.
+
+Límite de validación:
+- El comportamiento real de foco, mnemónicos Alt+E/Alt+R/Alt+F y lectura con NVDA debe probarse en Windows, ya que este entorno no ejecuta wxPython con escritorio gráfico ni NVDA.

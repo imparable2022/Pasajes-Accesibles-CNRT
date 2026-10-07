@@ -1,0 +1,26 @@
+Pasajes Accesibles CNRT v1.2.10 - Validación final
+
+Resultado:
+- 47/47 pruebas unitarias aprobadas.
+- Compilación estática de pasajes_accesibles_cnrt y tests: correcta.
+- Auditor wxpython-accessible-app-development v1.2.3: 0 hallazgos.
+- Revisión RDD aplicada con los lentes Risk, Readability, Reliability y Resilience.
+- RDD detectó un conteo duplicable al regresar a un estado ya visto; se aplicó una única corrección acotada y quedó cubierto por prueba de regresión.
+- Cada estado normalizado se cuenta como máximo una vez por reserva localmente seguida.
+- reservation_created registra una reserva confirmada.
+- reservation_active representa Activa observada en CNRT.
+- reservation_ticket_issued representa Pasaje Emitido observado en CNRT; no equivale a confirmar que el viaje se realizó.
+- reservation_cancelled representa una anulación/cancelación verificada.
+- Estados no reconocidos se agrupan como other sin enviar el texto libre.
+- El código real de reserva de CNRT no se envía a PostHog.
+- El UUID de reserva está separado del UUID de instalación.
+- El archivo local de seguimiento no guarda en claro código de reserva, empresa, origen ni destino.
+- La telemetría sigue desactivada si falta project token o consentimiento.
+
+Limitación:
+Los estados posteriores solo se conocen cuando la aplicación consulta Mis solicitudes o verifica una anulación. Las estadísticas de Pasaje Emitido son estados observados, no un registro exhaustivo de cambios ocurridos con la aplicación cerrada.
+
+Importante:
+La integración no enviará datos hasta configurar PASAJES_ACCESIBLES_CNRT_POSTHOG_TOKEN con un project token público (phc_...). No usar una personal API key (phx_...) dentro de la aplicación.
+
+La ejecución gráfica real con CNRT y con NVDA/JAWS/Narrador debe verificarse en Windows.

@@ -1,0 +1,13 @@
+Pasajes Accesibles CNRT v1.2.4 — validación final
+
+Cambio principal
+- Se adoptó PolyForm Noncommercial License 1.0.0 para el código original del proyecto.
+- LICENSE.txt incluye la URL oficial y los Required Notice del proyecto.
+- THIRD_PARTY_NOTICES.md mantiene separadas las licencias de dependencias externas.
+- Se añadió la aclaración de que Pasajes Accesibles CNRT es un proyecto independiente y no oficial de CNRT.
+
+Validaciones
+- unittest: 27/27 pruebas correctas.
+- compileall: correcto.
+- No se modificó la lógica de CNRT ni la navegación/accesibilidad de la interfaz.
+- Se eliminaron __pycache__ y archivos .pyc/.pyo antes del empaquetado.
