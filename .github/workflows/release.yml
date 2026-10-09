@@ -106,6 +106,23 @@ jobs:
             "$hash  $(Split-Path $file -Leaf)" | Set-Content "$file.sha256" -Encoding ascii
           }
 
+      - name: Create stable latest aliases
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $installerVersioned = "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe"
+          $portableVersioned = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
+          $installerLatest = "release\Pasajes_Accesibles_CNRT_Setup.exe"
+          $portableLatest = "release\Pasajes_Accesibles_CNRT_Portable.zip"
+
+          Copy-Item $installerVersioned $installerLatest -Force
+          Copy-Item $portableVersioned $portableLatest -Force
+
+          foreach ($file in @($installerLatest, $portableLatest)) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            "$hash  $(Split-Path $file -Leaf)" | Set-Content "$file.sha256" -Encoding ascii
+          }
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -114,7 +131,11 @@ jobs:
           $version = "${{ github.ref_name }}".TrimStart('v')
           $installer = "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe"
           $portable = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
+          $installerLatest = "release\Pasajes_Accesibles_CNRT_Setup.exe"
+          $portableLatest = "release\Pasajes_Accesibles_CNRT_Portable.zip"
           gh release create "${{ github.ref_name }}" `
             $installer "$installer.sha256" `
             $portable "$portable.sha256" `
+            $installerLatest "$installerLatest.sha256" `
+            $portableLatest "$portableLatest.sha256" `
             --title "Pasajes Accesibles CNRT $version" --generate-notes
