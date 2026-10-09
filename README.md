@@ -8,8 +8,8 @@ Como este es un proyecto independiente, no es una aplicación oficial, por lo qu
 
 Si te gustaría donar para que pueda seguir haciendo programas como este, puedes hacerlo por estos medios:
 
-- **PayPal:** [paypal.me/paypalmemartinamanecer](https://paypal.me/paypalmemartinamanecer)
-- **Mercado Pago:** `imparable.m.pago`
+- 🇦🇷 **Desde Argentina — Mercado Pago:** `imparable.m.pago`
+- 🌎 **Desde los demás países — PayPal:** [paypal.me/paypalmemartinamanecer](https://paypal.me/paypalmemartinamanecer)
 
 ## ¿Qué podés hacer con este programa?
 
