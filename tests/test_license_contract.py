@@ -13,7 +13,7 @@ class LicenseContractTests(unittest.TestCase):
         self.assertIn("independent and unofficial project", text)
 
     def test_third_party_licenses_are_kept_separate(self):
-        text = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+        text = (ROOT / "docs" / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
         self.assertIn("wxWindows Library Licence", text)
         self.assertIn("Apache License 2.0", text)
         self.assertIn("MIT License", text)
