@@ -295,3 +295,10 @@ WCAG 3.0 sigue siendo un borrador y no se declara conformidad con un estándar t
 - Un actualizador auxiliar independiente espera a que cierre la aplicación, reemplaza la carpeta y vuelve a abrir la nueva versión.
 - El reemplazo mantiene una copia anterior durante la operación y vuelve a ella si no logra activar o iniciar la nueva versión.
 - Se añadió un manifiesto portable para preservar archivos ajenos al programa que la persona haya guardado dentro de su carpeta.
+
+### Versión 1.2.15
+
+- El instalador y la versión portátil ahora se publican con nombres fijos en cada GitHub Release.
+- Los enlaces de descarga del README usan `releases/latest/download`, por lo que siempre apuntan a la última versión estable sin tener que modificar el enlace.
+- El actualizador interno usa los mismos nombres fijos para encontrar futuras actualizaciones.
+- Se mantiene la verificación SHA-256 tanto para el instalador como para la versión portátil.
