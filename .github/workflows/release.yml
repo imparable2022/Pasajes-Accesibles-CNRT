@@ -76,6 +76,7 @@ jobs:
           if (!(Test-Path $iscc)) { throw "No se encontro Inno Setup" }
           $version = "${{ github.ref_name }}".TrimStart('v')
           & $iscc "/DAppVersion=$version" "/DBuildRoot=${{ github.workspace }}\dist\Pasajes Accesibles CNRT" "/DBrowserRoot=${{ github.workspace }}\build\ms-playwright" installer\PasajesAccesiblesCNRT.iss
+          Copy-Item "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe" "release\Pasajes_Accesibles_CNRT_Setup.exe" -Force
 
       - name: Build portable package
         shell: pwsh
@@ -90,35 +91,16 @@ jobs:
           Copy-Item "build\portable-helper\PasajesPortableUpdater.exe" "$portableRoot\PasajesPortableUpdater.exe" -Force
           "channel=portable`nversion=$version" | Set-Content "$portableRoot\.portable" -Encoding ascii
           python tools\write_portable_manifest.py "$portableRoot" --version $version
-          $zip = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
-          Compress-Archive -Path $portableRoot -DestinationPath $zip -CompressionLevel Optimal -Force
+          Compress-Archive -Path $portableRoot -DestinationPath "release\Pasajes_Accesibles_CNRT_Portable.zip" -CompressionLevel Optimal -Force
 
       - name: Write SHA-256
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
           $files = @(
-            "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe",
-            "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
+            "release\Pasajes_Accesibles_CNRT_Setup.exe",
+            "release\Pasajes_Accesibles_CNRT_Portable.zip"
           )
           foreach ($file in $files) {
-            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
-            "$hash  $(Split-Path $file -Leaf)" | Set-Content "$file.sha256" -Encoding ascii
-          }
-
-      - name: Create stable latest aliases
-        shell: pwsh
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          $installerVersioned = "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe"
-          $portableVersioned = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
-          $installerLatest = "release\Pasajes_Accesibles_CNRT_Setup.exe"
-          $portableLatest = "release\Pasajes_Accesibles_CNRT_Portable.zip"
-
-          Copy-Item $installerVersioned $installerLatest -Force
-          Copy-Item $portableVersioned $portableLatest -Force
-
-          foreach ($file in @($installerLatest, $portableLatest)) {
             $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
             "$hash  $(Split-Path $file -Leaf)" | Set-Content "$file.sha256" -Encoding ascii
           }
@@ -128,14 +110,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
+          $installer = "release\Pasajes_Accesibles_CNRT_Setup.exe"
+          $portable = "release\Pasajes_Accesibles_CNRT_Portable.zip"
           $version = "${{ github.ref_name }}".TrimStart('v')
-          $installer = "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe"
-          $portable = "release\Pasajes_Accesibles_CNRT_Portable_v$version.zip"
-          $installerLatest = "release\Pasajes_Accesibles_CNRT_Setup.exe"
-          $portableLatest = "release\Pasajes_Accesibles_CNRT_Portable.zip"
           gh release create "${{ github.ref_name }}" `
             $installer "$installer.sha256" `
             $portable "$portable.sha256" `
-            $installerLatest "$installerLatest.sha256" `
-            $portableLatest "$portableLatest.sha256" `
             --title "Pasajes Accesibles CNRT $version" --generate-notes
