@@ -29,11 +29,7 @@ class FakeResponse:
 
 
 def update_info(channel: str, payload: bytes = b"payload", version: str = "1.2.15") -> updater.UpdateInfo:
-    name = (
-        f"{updater.PORTABLE_PREFIX}{version}.zip"
-        if channel == updater.CHANNEL_PORTABLE
-        else f"{updater.INSTALLER_PREFIX}{version}.exe"
-    )
+    name = updater.PORTABLE_ASSET if channel == updater.CHANNEL_PORTABLE else updater.INSTALLER_ASSET
     return updater.UpdateInfo(
         version=version,
         tag=f"v{version}",
@@ -78,7 +74,7 @@ class UpdaterTests(unittest.TestCase):
     def test_latest_release_requires_expected_installer_and_sha256(self):
         data = b"installer-content"
         digest = hashlib.sha256(data).hexdigest()
-        name = "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe"
+        name = updater.INSTALLER_ASSET
         release = {
             "tag_name": "v1.2.15",
             "draft": False,
@@ -98,13 +94,14 @@ class UpdaterTests(unittest.TestCase):
             ).latest()
         self.assertIsNotNone(info)
         self.assertEqual(info.version, "1.2.15")
+        self.assertEqual(info.asset_name, updater.INSTALLER_ASSET)
         self.assertEqual(info.channel, updater.CHANNEL_INSTALLER)
         self.assertEqual(info.sha256, digest)
 
     def test_latest_release_selects_portable_zip_for_portable_channel(self):
         data = b"portable-content"
         digest = hashlib.sha256(data).hexdigest()
-        name = "Pasajes_Accesibles_CNRT_Portable_v1.2.15.zip"
+        name = updater.PORTABLE_ASSET
         release = {
             "tag_name": "v1.2.15",
             "draft": False,
@@ -139,8 +136,8 @@ class UpdaterTests(unittest.TestCase):
             "draft": False,
             "prerelease": False,
             "assets": [{
-                "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
-                "browser_download_url": "https://evil.example/Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
+                "name": updater.INSTALLER_ASSET,
+                "browser_download_url": f"https://evil.example/{updater.INSTALLER_ASSET}",
                 "size": 1,
                 "digest": "sha256:" + digest,
             }],
@@ -158,13 +155,13 @@ class UpdaterTests(unittest.TestCase):
             "prerelease": False,
             "assets": [
                 {
-                    "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
-                    "browser_download_url": "https://github.com/example/repo/releases/download/v1.2.15/Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
+                    "name": updater.INSTALLER_ASSET,
+                    "browser_download_url": f"https://github.com/example/repo/releases/download/v1.2.15/{updater.INSTALLER_ASSET}",
                     "size": 1,
                 },
                 {
-                    "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe.sha256",
-                    "browser_download_url": "https://github.com/attacker/repo/releases/download/v1.2.15/Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe.sha256",
+                    "name": updater.INSTALLER_ASSET + ".sha256",
+                    "browser_download_url": f"https://github.com/attacker/repo/releases/download/v1.2.15/{updater.INSTALLER_ASSET}.sha256",
                     "size": 80,
                 },
             ],
@@ -181,8 +178,8 @@ class UpdaterTests(unittest.TestCase):
             "draft": False,
             "prerelease": False,
             "assets": [{
-                "name": "Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
-                "browser_download_url": "https://github.com/example/repo/releases/download/v1.2.15/Pasajes_Accesibles_CNRT_Setup_v1.2.15.exe",
+                "name": updater.INSTALLER_ASSET,
+                "browser_download_url": f"https://github.com/example/repo/releases/download/v1.2.15/{updater.INSTALLER_ASSET}",
                 "size": 100,
             }],
         }
