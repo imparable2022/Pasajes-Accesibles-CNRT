@@ -76,7 +76,6 @@ jobs:
           if (!(Test-Path $iscc)) { throw "No se encontro Inno Setup" }
           $version = "${{ github.ref_name }}".TrimStart('v')
           & $iscc "/DAppVersion=$version" "/DBuildRoot=${{ github.workspace }}\dist\Pasajes Accesibles CNRT" "/DBrowserRoot=${{ github.workspace }}\build\ms-playwright" installer\PasajesAccesiblesCNRT.iss
-          Copy-Item "release\Pasajes_Accesibles_CNRT_Setup_v$version.exe" "release\Pasajes_Accesibles_CNRT_Setup.exe" -Force
 
       - name: Build portable package
         shell: pwsh
