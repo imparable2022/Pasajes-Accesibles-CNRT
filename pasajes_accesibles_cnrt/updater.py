@@ -22,8 +22,8 @@ from .build_info import GITHUB_REPOSITORY
 from .storage import APP_DIR
 
 GITHUB_API = "https://api.github.com"
-INSTALLER_PREFIX = "Pasajes_Accesibles_CNRT_Setup_v"
-PORTABLE_PREFIX = "Pasajes_Accesibles_CNRT_Portable_v"
+INSTALLER_ASSET = "Pasajes_Accesibles_CNRT_Setup.exe"
+PORTABLE_ASSET = "Pasajes_Accesibles_CNRT_Portable.zip"
 PORTABLE_MARKER = ".portable"
 PORTABLE_HELPER = "PasajesPortableUpdater.exe"
 PORTABLE_MANIFEST = ".portable-manifest.json"
@@ -151,11 +151,11 @@ def _fetch_checksum_asset(url: str, repository: str, tag: str, timeout: float) -
     return first.lower()
 
 
-def _expected_asset_name(version: str, channel: str) -> str:
+def _expected_asset_name(channel: str) -> str:
     if channel == CHANNEL_PORTABLE:
-        return f"{PORTABLE_PREFIX}{version}.zip"
+        return PORTABLE_ASSET
     if channel == CHANNEL_INSTALLER:
-        return f"{INSTALLER_PREFIX}{version}.exe"
+        return INSTALLER_ASSET
     raise UpdateError("El canal de actualización no es válido.")
 
 
@@ -212,7 +212,7 @@ class GitHubUpdateService:
         if not is_newer_version(version, self.current_version):
             return None
 
-        asset_name = _expected_asset_name(version, self.channel)
+        asset_name = _expected_asset_name(self.channel)
         assets = data.get("assets") or []
         if not isinstance(assets, list):
             raise UpdateError("GitHub no devolvió una lista válida de archivos del release.")
@@ -310,7 +310,7 @@ class GitHubUpdateService:
         installer = Path(installer).resolve()
         if os.name != "nt":
             raise UpdateError("La instalación automática solo está disponible en Windows.")
-        if installer.suffix.lower() != ".exe" or not installer.name.startswith(INSTALLER_PREFIX):
+        if installer.suffix.lower() != ".exe" or installer.name != INSTALLER_ASSET:
             raise UpdateError("El archivo descargado no tiene el nombre de un instalador válido.")
         try:
             subprocess.Popen(
