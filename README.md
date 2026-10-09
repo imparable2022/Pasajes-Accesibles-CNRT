@@ -32,8 +32,8 @@ Si te gustaría donar para que pueda seguir haciendo programas como este, puedes
 
 Tenés dos opciones para usar el programa, y ambas te avisarán si hay alguna actualización para que siempre estés al día con las últimas funciones:
 
-1. [**Instalador (`.exe`)**](https://github.com/imparable2022/Pasajes-Accesibles-CNRT/releases/download/v1.2.14/Pasajes_Accesibles_CNRT_Setup_v1.2.14.exe): Se instala en tu computadora como cualquier programa tradicional, abrilo desde el escritorio o menú Inicio.
-2. [**Versión portátil (`.zip`)**](https://github.com/imparable2022/Pasajes-Accesibles-CNRT/releases/download/v1.2.14/Pasajes_Accesibles_CNRT_Portable_v1.2.14.zip): Ideal si no tenés ganas de instalar nada. Solo descomprimí el archivo en una carpeta y abrí `pasajes_accesibles_cnrt.exe`.
+1. [**Instalador (`.exe`)**](https://github.com/imparable2022/Pasajes-Accesibles-CNRT/releases/latest/download/Pasajes_Accesibles_CNRT_Setup.exe): Se instala en tu computadora como cualquier programa tradicional, abrilo desde el escritorio o menú Inicio.
+2. [**Versión portátil (`.zip`)**](https://github.com/imparable2022/Pasajes-Accesibles-CNRT/releases/latest/download/Pasajes_Accesibles_CNRT_Portable.zip): Ideal si no tenés ganas de instalar nada. Solo descomprimí el archivo en una carpeta y abrí `pasajes_accesibles_cnrt.exe`.
 
 *Nota técnica: Ya sea que uses la versión instalable o portátil, tus configuraciones y credenciales se guardan en un lugar seguro de tu usuario de Windows (`%APPDATA%`). Esto significa que podés actualizar el programa sin miedo a perder tus datos.*
 
