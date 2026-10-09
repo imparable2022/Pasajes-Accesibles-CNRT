@@ -6,6 +6,11 @@ Desarrollé la aplicación con la idea de hacer que buscar y reservar los pasaje
 
 Como este es un proyecto independiente, no es una aplicación oficial, por lo que no está patrocinada ni avalada por la Comisión Nacional de Regulación del Transporte (CNRT).
 
+Si te gustaría donar para que pueda seguir haciendo programas como este, puedes hacerlo por estos medios:
+
+- **PayPal:** `paypalmemartinamanecer`
+- **Mercado Pago:** `imparable.m.pago`
+
 ## ¿Qué podés hacer con este programa?
 
 - **Ingresar fácilmente:** Iniciás sesión con tu DNI y tu número de credencial (CUD, INCUCAI o pases municipales/provinciales).
