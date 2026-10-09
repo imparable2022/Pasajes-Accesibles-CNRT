@@ -11,7 +11,7 @@ Como este es un proyecto independiente, no es una aplicación oficial, por lo qu
 - **Ingresar fácilmente:** Iniciás sesión con tu DNI y tu número de credencial (CUD, INCUCAI o pases municipales/provinciales).
 - **Recordar credenciales (opcional):** Si querés, podés hacer que el programa recuerde tus datos de ingreso para no tener que escribirlos cada vez que uses el programa.
 - **Buscar sin complicaciones:** Escribís tu origen y destino, y el programa te va a ir sugiriendo las localidades.
-- **Búsquedas a tu medida:** Buscás pasajes para un día específico, revisás un rango de varios días o escaneás todas las fechas que la CNRT tenga habilitadas para el origen y destino que coloques.
+- **Búsquedas a tu medida:** Buscás pasajes para un día específico, revisás un rango de varios días o escaneás todas las fechas que la CNRT tenga habilitadas para el origen y destino que ingreses.
 - **Resultados útiles:** El programa solo te va a mostrar los servicios que realmente tengan lugares disponibles.
 - **Reservas seguras:** Antes de confirmar, el programa vuelve a verificar en tiempo real que el asiento siga libre.
 - **Personalizá tu viaje:** Elegís si preferís viajar en planta baja o alta y especificás el motivo.
