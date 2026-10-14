@@ -86,6 +86,46 @@ class SearchUiContractTests(unittest.TestCase):
         self.assertIn('self._announce("Reserva anulada con éxito. La anulación fue verificada por CNRT.")', SOURCE)
 
 
+    def test_search_screen_has_clear_data_alt_l(self):
+        self.assertIn('label="&Limpiar datos"', SOURCE)
+        self.assertIn('name="Limpiar datos de búsqueda"', SOURCE)
+        self.assertIn('clear.Bind(wx.EVT_BUTTON, self.on_clear_search_fields)', SOURCE)
+        self.assertIn('def on_clear_search_fields(self, event=None):', SOURCE)
+
+    def test_clear_search_data_empties_origin_destination_and_all_date_editors(self):
+        self.assertIn('combo.ChangeValue("")', SOURCE)
+        self.assertIn('for prefix in ("travel", "from", "to"):', SOURCE)
+        self.assertIn('self._clear_date_editor(prefix)', SOURCE)
+        self.assertIn('text_ctrl.ChangeValue("")', SOURCE)
+        self.assertIn('control.SetSelection(wx.NOT_FOUND)', SOURCE)
+        self.assertIn('self.origin_combo.SetFocus()', SOURCE)
+        self.assertIn('Origen, destino y fechas quedaron vacíos.', SOURCE)
+
+    def test_results_have_alt_p_back_to_search_and_menu(self):
+        self.assertIn('label="Volver a buscar &pasajes"', SOURCE)
+        self.assertIn('name="Volver a buscar pasajes"', SOURCE)
+        self.assertIn('again.Bind(wx.EVT_BUTTON, self._show_search)', SOURCE)
+        self.assertIn('label="Volver al &menú"', SOURCE)
+        self.assertNotIn('label="Nueva búsqueda"', SOURCE)
+
+    def test_secondary_views_keep_a_meaningful_back_path(self):
+        self.assertGreaterEqual(SOURCE.count('label="Volver a &resultados"'), 2)
+        self.assertIn('back.Bind(wx.EVT_BUTTON, self._return_to_results_from_confirmation)', SOURCE)
+        self.assertIn('def _return_to_results_from_confirmation(self, event=None):', SOURCE)
+        self.assertIn('label="Volver al &menú"', SOURCE)
+
+    def test_navigation_restores_focus_to_an_actionable_control(self):
+        self.assertIn('first_button.SetFocus()', SOURCE)
+        self.assertIn('again.SetFocus()', SOURCE)
+        self.assertIn('refresh.SetFocus()', SOURCE)
+        self.assertIn('search.SetFocus()', SOURCE)
+
+    def test_clear_during_active_scan_discards_stale_results(self):
+        self.assertIn('self._discard_scan_result = True', SOURCE)
+        self.assertIn('self.scan_cancel_event.set()', SOURCE)
+        self.assertIn('if self._discard_scan_result:', SOURCE)
+
+
     def test_visual_header_uses_meaningful_accessible_name_instead_of_generic_label(self):
         self.assertIn('def _heading(self, text: str, accessible_text: str | None = None):', SOURCE)
         self.assertIn('header = wx.Panel(self.content, name=spoken)', SOURCE)
