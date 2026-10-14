@@ -1,0 +1,46 @@
+name: Apply accessible navigation
+
+on:
+  push:
+    branches:
+      - feature/accessibility-navigation
+    paths:
+      - .github/workflows/apply-accessible-navigation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/accessibility-navigation
+
+      - name: Verify base and apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object pasajes_accesibles_cnrt/app.py)" = "a9232427f8947b1d08a2bd8d148a3d8aa0f8e622"
+          test "$(git hash-object tests/test_ui_contract.py)" = "cf59d97df45ade343b3253ea1e5f59496e31dfc1"
+          git apply --check .automation/accessibility_navigation.patch
+          git apply .automation/accessibility_navigation.patch
+
+      - name: Validate
+        run: |
+          python -m py_compile pasajes_accesibles_cnrt/app.py
+          python -m unittest discover -s tests -q
+
+      - name: Commit applied change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .automation/accessibility_navigation.patch
+          git rm .github/workflows/apply-accessible-navigation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pasajes_accesibles_cnrt/app.py tests/test_ui_contract.py
+          git commit -m "feat: mejorar navegación accesible de búsqueda"
+          git push origin HEAD:feature/accessibility-navigation
