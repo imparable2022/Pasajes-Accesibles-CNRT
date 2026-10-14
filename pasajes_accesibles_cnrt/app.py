@@ -124,6 +124,7 @@ class MainFrame(wx.Frame):
         self._accept_locality_after_search = {"origin": False, "destination": False}
         self._search_fields_cleared = False
         self._discard_scan_result = False
+        self._last_search_form: dict | None = None
 
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour(self._colour("bg"))
@@ -924,7 +925,8 @@ class MainFrame(wx.Frame):
             first_button.SetFocus()
 
     # ---------------- Búsqueda ----------------
-    def _show_search(self, event=None):
+    def _show_search(self, event=None, restore_previous=False):
+        saved_search = self._last_search_form if restore_previous else None
         self._clear_content()
         self._search_fields_cleared = False
         self._heading("Buscar pasajes")
@@ -1028,9 +1030,12 @@ class MainFrame(wx.Frame):
         self.content_sizer.Add(row, 0)
 
         self._populate_date_choices()
-        self._set_date_value("travel", self.allowed_min_date)
-        self._set_date_value("from", self.allowed_min_date)
-        self._set_date_value("to", self._clamp_allowed_date(self.allowed_min_date + timedelta(days=1)))
+        if saved_search is not None:
+            self._restore_search_form(saved_search)
+        else:
+            self._set_date_value("travel", self.allowed_min_date)
+            self._set_date_value("from", self.allowed_min_date)
+            self._set_date_value("to", self._clamp_allowed_date(self.allowed_min_date + timedelta(days=1)))
         self._on_search_mode_change(None, move_focus=False)
         self._apply_control_theme()
         self.content.Layout()
@@ -1039,6 +1044,68 @@ class MainFrame(wx.Frame):
         # CNRT publica los límites reales en su página. Los pedimos después de
         # dibujar la ventana para que la interfaz aparezca de inmediato.
         self.worker.submit("allowed_date_range", callback=self._after_allowed_date_range)
+
+    def _remember_search_form(self):
+        mode = (
+            "specific" if self.mode_specific.GetValue() else
+            "range" if self.mode_range.GetValue() else
+            "all"
+        )
+        self._last_search_form = {
+            "origin": self.selected_origin,
+            "destination": self.selected_destination,
+            "quantity_index": self.quantity.GetSelection(),
+            "delay": float(self.delay.GetValue()),
+            "mode": mode,
+            "travel_date": self.travel_date.GetValue(),
+            "from_date": self.from_date.GetValue(),
+            "to_date": self.to_date.GetValue(),
+        }
+
+    def _restore_search_form(self, state: dict):
+        origin = state.get("origin")
+        destination = state.get("destination")
+        self.selected_origin = origin
+        self.selected_destination = destination
+        self.origin_results = [origin] if origin is not None else []
+        self.destination_results = [destination] if destination is not None else []
+
+        for combo, selected in (
+            (self.origin_combo, origin),
+            (self.destination_combo, destination),
+        ):
+            combo.Clear()
+            if selected is not None:
+                combo.Append(selected.text)
+                combo.ChangeValue(selected.text)
+            else:
+                combo.ChangeValue("")
+
+        quantity_index = int(state.get("quantity_index", 0))
+        if 0 <= quantity_index < self.quantity.GetCount():
+            self.quantity.SetSelection(quantity_index)
+        self.delay.SetValue(float(state.get("delay", 0.9)))
+
+        mode = state.get("mode", "specific")
+        self.mode_specific.SetValue(mode == "specific")
+        self.mode_range.SetValue(mode == "range")
+        self.mode_all.SetValue(mode == "all")
+
+        for prefix, key in (
+            ("travel", "travel_date"),
+            ("from", "from_date"),
+            ("to", "to_date"),
+        ):
+            raw_value = str(state.get(key, "")).strip()
+            try:
+                parsed = datetime.strptime(raw_value, "%d-%m-%Y").date()
+            except ValueError:
+                getattr(self, f"{prefix}_date").ChangeValue(raw_value)
+                continue
+            self._set_date_value(prefix, parsed)
+
+    def _return_to_search(self, event=None):
+        self._show_search(restore_previous=True)
 
     def _clear_date_editor(self, prefix: str):
         text_ctrl = getattr(self, f"{prefix}_date", None)
@@ -1073,6 +1140,7 @@ class MainFrame(wx.Frame):
         self._locality_nav_index = {"origin": -1, "destination": -1}
         self._accept_locality_after_search = {"origin": False, "destination": False}
         self._search_fields_cleared = True
+        self._last_search_form = None
 
         for combo_name in ("origin_combo", "destination_combo"):
             combo = getattr(self, combo_name, None)
@@ -1577,6 +1645,7 @@ class MainFrame(wx.Frame):
         self.on_search_dates(event)
 
     def _start_scan(self, start_date: date | None, end_date: date | None):
+        self._remember_search_form()
         self._discard_scan_result = False
         self.scan_cancel_event = threading.Event()
         kwargs = dict(
@@ -1640,7 +1709,7 @@ class MainFrame(wx.Frame):
             label="Volver a buscar &pasajes",
             name="Volver a buscar pasajes",
         )
-        again.Bind(wx.EVT_BUTTON, self._show_search)
+        again.Bind(wx.EVT_BUTTON, self._return_to_search)
         row.Add(again, 0, wx.RIGHT, 8)
         menu = wx.Button(self.content, label="Volver al &menú")
         menu.Bind(wx.EVT_BUTTON, lambda e: self._show_main_menu())
