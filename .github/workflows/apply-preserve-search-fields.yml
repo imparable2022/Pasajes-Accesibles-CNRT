@@ -1,0 +1,49 @@
+name: Apply preserve search fields
+
+on:
+  push:
+    branches:
+      - fix/preserve-search-fields
+    paths:
+      - .github/workflows/apply-preserve-search-fields.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/preserve-search-fields
+
+      - name: Verify base and apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object pasajes_accesibles_cnrt/app.py)" = "b1a81feefef3268dc51c5f20828cad5a35f4d1c8"
+          test "$(git hash-object tests/test_ui_contract.py)" = "274a4038891d55da01c8cf930b39c573d103f1fc"
+          git apply --check .automation/preserve-search-fields.patch
+          git apply .automation/preserve-search-fields.patch
+
+      - name: Install test dependencies
+        run: python -m pip install "beautifulsoup4>=4.14,<5" "playwright>=1.57,<2"
+
+      - name: Validate
+        run: |
+          python -m py_compile pasajes_accesibles_cnrt/app.py
+          python -m unittest discover -s tests -q
+
+      - name: Commit applied change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .automation/preserve-search-fields.patch
+          git rm .github/workflows/apply-preserve-search-fields.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pasajes_accesibles_cnrt/app.py tests/test_ui_contract.py
+          git commit -m "fix: conservar datos al volver a buscar pasajes"
+          git push origin HEAD:fix/preserve-search-fields
