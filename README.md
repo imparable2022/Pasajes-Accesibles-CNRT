@@ -10,6 +10,7 @@ Si tenés alguna duda o consulta sobre el programa, comunicate conmigo:
 
 - **Instagram:** [@conexion_inclusiva](https://www.instagram.com/conexion_inclusiva/)
 - **Correo electrónico:** [martinortiz4362@gmail.com](mailto:martinortiz4362@gmail.com))
+
 Si el programa   te sirve y te gustaría colaborar conmigo para que pueda seguir haciendo más programas  como este que ayuden a los demás, podés hacerlo por estos medios:
 
 - 🇦🇷 **Desde Argentina — Mercado Pago:** `imparable.m.pago`
