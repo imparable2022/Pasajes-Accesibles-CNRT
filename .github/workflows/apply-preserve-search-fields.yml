@@ -19,14 +19,13 @@ jobs:
         with:
           ref: fix/preserve-search-fields
 
-      - name: Verify base and apply patch
+      - name: Verify base and apply controlled transform
         shell: bash
         run: |
           set -euo pipefail
           test "$(git hash-object pasajes_accesibles_cnrt/app.py)" = "b1a81feefef3268dc51c5f20828cad5a35f4d1c8"
           test "$(git hash-object tests/test_ui_contract.py)" = "274a4038891d55da01c8cf930b39c573d103f1fc"
-          git apply --check .automation/preserve-search-fields.patch
-          git apply .automation/preserve-search-fields.patch
+          python .automation/apply_preserve_search_fields.py
 
       - name: Install test dependencies
         run: python -m pip install "beautifulsoup4>=4.14,<5" "playwright>=1.57,<2"
@@ -41,6 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           git rm .automation/preserve-search-fields.patch
+          git rm .automation/apply_preserve_search_fields.py
           git rm .github/workflows/apply-preserve-search-fields.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
