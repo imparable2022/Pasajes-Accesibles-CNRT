@@ -104,9 +104,24 @@ class SearchUiContractTests(unittest.TestCase):
     def test_results_have_alt_p_back_to_search_and_menu(self):
         self.assertIn('label="Volver a buscar &pasajes"', SOURCE)
         self.assertIn('name="Volver a buscar pasajes"', SOURCE)
-        self.assertIn('again.Bind(wx.EVT_BUTTON, self._show_search)', SOURCE)
+        self.assertIn('again.Bind(wx.EVT_BUTTON, self._return_to_search)', SOURCE)
         self.assertIn('label="Volver al &menú"', SOURCE)
         self.assertNotIn('label="Nueva búsqueda"', SOURCE)
+
+    def test_back_from_results_restores_the_previous_search(self):
+        self.assertIn('self._last_search_form: dict | None = None', SOURCE)
+        self.assertIn('def _remember_search_form(self):', SOURCE)
+        self.assertIn('"origin": self.selected_origin', SOURCE)
+        self.assertIn('"destination": self.selected_destination', SOURCE)
+        self.assertIn('"travel_date": self.travel_date.GetValue()', SOURCE)
+        self.assertIn('"from_date": self.from_date.GetValue()', SOURCE)
+        self.assertIn('"to_date": self.to_date.GetValue()', SOURCE)
+        self.assertIn('self._remember_search_form()', SOURCE)
+        self.assertIn('def _return_to_search(self, event=None):', SOURCE)
+        self.assertIn('self._show_search(restore_previous=True)', SOURCE)
+        self.assertIn('saved_search = self._last_search_form if restore_previous else None', SOURCE)
+        self.assertIn('self._restore_search_form(saved_search)', SOURCE)
+        self.assertIn('self._last_search_form = None', SOURCE)
 
     def test_secondary_views_keep_a_meaningful_back_path(self):
         self.assertGreaterEqual(SOURCE.count('label="Volver a &resultados"'), 2)
