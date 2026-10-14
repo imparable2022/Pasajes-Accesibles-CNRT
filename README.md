@@ -6,7 +6,11 @@ Desarrollé la aplicación con la idea de hacer que buscar y reservar los pasaje
 
 Como este es un proyecto independiente, no es una aplicación oficial, por lo que no está patrocinada ni avalada por la Comisión Nacional de Regulación del Transporte (CNRT).
 
-Si te gustaría donar para que pueda seguir haciendo programas como este, puedes hacerlo por estos medios:
+Si tenés alguna duda o consulta sobre el programa, comunicate conmigo:
+
+- **Instagram:** [@conexion_inclusiva](https://www.instagram.com/conexion_inclusiva/)
+- **Correo electrónico:** [martinortiz4362@gmail.com](mailto:martinortiz4362@gmail.com))
+- Si el programa   te sirve y te gustaría colaborar conmigo para que pueda seguir haciendo más programas  como este que ayuden a los demás, podés hacerlo por estos medios:
 
 - 🇦🇷 **Desde Argentina — Mercado Pago:** `imparable.m.pago`
 - 🌎 **Desde los demás países — PayPal:** [paypal.me/paypalmemartinamanecer](https://paypal.me/paypalmemartinamanecer)
@@ -24,18 +28,19 @@ Si te gustaría donar para que pueda seguir haciendo programas como este, puedes
 
 ## ¿Qué necesitás para usarlo?
 
-- Windows 10 o Windows 11 (versiones de 64 bits).
-- Si lo necesitás, un lector de pantalla como NVDA, JAWS, etc.; y si no, no te va a hacer falta porque funciona muy bien usándolo con el ratón.
+- Windows 8, 10  o 11 (versiones de 64 bits).
+- Si sos alguien con discapacidad visual, un lector de pantalla como NVDA, JAWS, etc.;
+- Y si no, no te va a hacer falta porque funciona muy bien usándolo con el ratón.
 - Conexión a Internet.
 
-## Cómo descargar e instalar
+## Cómo descargarlo para usarlo.
 
-Tenés dos opciones para usar el programa, y ambas te avisarán si hay alguna actualización para que siempre estés al día con las últimas funciones:
+Tenés dos opciones para usar el programa, y ambas te avisarán si hay alguna actualización para que siempre estés al día con las últimas funciones que le baya agregando:
 
 1. [**Instalador (`.exe`)**](https://github.com/imparable2022/Pasajes-Accesibles-CNRT/releases/latest/download/Pasajes_Accesibles_CNRT_Setup.exe): Se instala en tu computadora como cualquier programa tradicional, abrilo desde el escritorio o menú Inicio.
 2. [**Versión portátil (`.zip`)**](https://github.com/imparable2022/Pasajes-Accesibles-CNRT/releases/latest/download/Pasajes_Accesibles_CNRT_Portable.zip): Ideal si no tenés ganas de instalar nada. Solo descomprimí el archivo en una carpeta y abrí `Pasajes Accesibles CNRT.exe`.
 
-*Nota técnica: Ya sea que uses la versión instalable o portátil, tus configuraciones y credenciales se guardan en un lugar seguro de tu usuario de Windows (`%APPDATA%`). Esto significa que podés actualizar el programa sin miedo a perder tus datos.*
+*Nota técnica: Ya sea que usés la versión instalable o portátil, tus configuraciones y credenciales se guardan en un lugar seguro de tu usuario de Windows (`%APPDATA%`). Esto significa que podés actualizar el programa sin miedo a perder tus datos.*
 
 ## Para programadores (instalación desde el código fuente)
 
@@ -74,10 +79,10 @@ Desde la sección **Mis solicitudes** podés revisar y administrar todos los pas
 2. **Modificar tus datos:** Si la CNRT lo permite para ese pasaje, podés cambiar tu dirección de correo electrónico de contacto o tu preferencia de ubicación (planta baja / alta).
 3. **Anular pasajes:** Si ya no vas a viajar, podés cancelar la solicitud directamente desde la aplicación cuando el sistema de CNRT tenga la opción disponible.
 
-## Tips de accesibilidad e interacción
+## Tips de accesibilidad y uso.
 
-- Podés moverte de un control a otro cómodamente usando las teclas **Tab** y **Shift + Tab**, además de los atajos de teclado.
-- Presioná **F6** en cualquier momento para saltar al cuadro de **Estado** y escuchar con tu lector de pantalla los últimos mensajes y novedades del programa.
+- Podés moverte de un control a otro cómodamente usando las teclas **Tab** y **Shift + Tab** o usando el ratón, además de los atajos de teclado.
+- Presioná **F6** en cualquier momento para saltar al cuadro de **Estado** y escuchar con tu lector de pantalla si lo usás los  últimos mensajes y novedades del programa.
 
 ## Detalles técnicos y límites
 
