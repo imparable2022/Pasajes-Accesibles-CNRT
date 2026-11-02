@@ -32,6 +32,22 @@ class ReservationFlowRegressionTests(unittest.TestCase):
         self.assertNotIn('"get_profile"', after_prepare.group("body"))
         self.assertIn("self._show_confirmation(summary, profile)", after_prepare.group("body"))
 
+    def test_two_passage_reservation_sends_and_verifies_companion(self):
+        client = (Path(__file__).resolve().parents[1] / "pasajes_accesibles_cnrt" / "client.py").read_text(encoding="utf-8")
+        self.assertIn("companion: Optional[Companion] = None", client)
+        self.assertIn('p.select_option("#documentoOpciones"', client)
+        self.assertIn('p.fill("#nroDocumento"', client)
+        self.assertIn('p.fill("#apellido"', client)
+        self.assertIn('p.fill("#nombre"', client)
+        self.assertIn("expected_companion = {", client)
+        self.assertIn("CNRT abrió la confirmación pero no conservó todos los datos del acompañante.", client)
+
+    def test_companion_storage_is_separate_from_login_credentials(self):
+        storage = (Path(__file__).resolve().parents[1] / "pasajes_accesibles_cnrt" / "storage.py").read_text(encoding="utf-8")
+        self.assertIn("class CompanionStore(CredentialStore):", storage)
+        self.assertIn('APP_DIR / "acompanante.dat"', storage)
+        self.assertIn('APP_DIR / "credenciales.dat"', storage)
+
     def test_final_reservation_has_no_extra_confirmation_dialog_and_shows_success(self):
         source = (Path(__file__).resolve().parents[1] / "pasajes_accesibles_cnrt" / "app.py").read_text(encoding="utf-8")
 
