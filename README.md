@@ -331,3 +331,9 @@ WCAG 3.0 sigue siendo un borrador y no se declara conformidad con un estándar t
 - Corregido un bloqueo al preparar una reserva cuando el calendario emergente de CNRT quedaba abierto después de escribir la fecha y tapaba los botones de cantidad de pasajes.
 - La aplicación cierra explícitamente el selector de fecha antes de continuar.
 - La selección de **1** o **2 pasajes** ya no depende de que el botón de opción esté libre de superposiciones visuales, evitando el `Timeout 20000ms exceeded` observado al reservar con acompañante.
+
+### Versión 1.2.19
+
+- Se simplificó el diálogo **Actualización disponible** para mostrar solamente la versión instalada, una sección **¿Qué hay de nuevo?** y la pregunta para actualizar.
+- Las notas generadas automáticamente por GitHub se limpian antes de mostrarse: se omiten encabezados, autores, enlaces y el enlace de comparación completa, y se priorizan los cambios de la versión nueva.
+- El diálogo **Actualización portable lista** usa un texto más simple y confirma que los datos guardados no se borrarán, sin exponer detalles técnicos como SHA-256 al usuario.
