@@ -72,7 +72,7 @@ def parse_available_services(
         for child in container.children:
             if child is label:
                 break
-            if getattr(child, "find", None) and child.find("label"):
+            if getattr(child, "name", None) and getattr(child, "find", None) and child.find("label"):
                 break
             if isinstance(child, str):
                 value = _clean(child)
@@ -122,6 +122,7 @@ def parse_available_services(
         )
 
     return result
+
 
 def parse_confirmation_summary(html: str) -> ConfirmationSummary:
     soup = BeautifulSoup(html, "html.parser")
