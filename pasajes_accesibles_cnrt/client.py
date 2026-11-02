@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
 
 from .errors import AvailabilityChangedError, CnrtError, LoginError, SessionExpiredError, StructureChangedError
-from .models import ConfirmationSummary, Locality, Profile, RequestRecord, ScanResult, SearchConstraints, Service
+from .models import Companion, ConfirmationSummary, Locality, Profile, RequestRecord, ScanResult, SearchConstraints, Service
 from .parsers import is_confirmed, parse_alerts, parse_available_services, parse_confirmation_summary, parse_constraints, parse_request_records
 from .storage import LocalityCache
 
@@ -177,6 +177,7 @@ class CnrtClient:
         origin: Locality,
         destination: Locality,
         quantity: int = 1,
+        include_unavailable: bool = False,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         delay_seconds: float = 0.9,
@@ -198,14 +199,18 @@ class CnrtClient:
                 break
             try:
                 html = self._post_search(origin, destination, current, quantity)
-                services = parse_available_services(html, current)
+                services = parse_available_services(
+                    html,
+                    current,
+                    include_unavailable=include_unavailable,
+                )
                 result.services.extend(services)
             except Exception as exc:
                 result.errors.append(f"{current.strftime('%d/%m/%Y')}: {exc}")
                 services = []
             result.scanned_dates += 1
             if progress:
-                progress(idx + 1, total, current, len(services))
+                progress(idx + 1, total, current, sum(1 for s in services if s.available))
             current += timedelta(days=1)
             if idx + 1 < total and delay_seconds > 0:
                 time.sleep(max(0.0, delay_seconds))
@@ -220,6 +225,7 @@ class CnrtClient:
         quantity: int,
         preference: str = "1",
         preference_reason: str = "",
+        companion: Optional[Companion] = None,
     ) -> ConfirmationSummary:
         self._ensure_session()
         # Revalidación en vivo antes de tocar el formulario de reserva.
@@ -249,6 +255,39 @@ class CnrtClient:
                 target.check()
         if p.locator("#motivoPreferencia").count():
             p.fill("#motivoPreferencia", preference_reason[:30])
+
+        if quantity == 2:
+            if companion is None:
+                raise ValueError("Ingrese los datos del acompañante para solicitar dos pasajes.")
+            missing = [
+                label
+                for label, value in (
+                    ("tipo de documento", companion.document_type),
+                    ("número de documento", companion.document_number),
+                    ("apellido", companion.surname),
+                    ("nombre", companion.given_name),
+                )
+                if not str(value).strip()
+            ]
+            if missing:
+                raise ValueError("Faltan datos del acompañante: " + ", ".join(missing) + ".")
+
+            companion_fields = {
+                "#documentoOpciones": companion.document_type.strip(),
+                "#nroDocumento": companion.document_number.strip(),
+                "#apellido": companion.surname.strip(),
+                "#nombre": companion.given_name.strip(),
+            }
+            for selector in companion_fields:
+                if not p.locator(selector).count():
+                    raise StructureChangedError(
+                        "CNRT no mostró todos los campos esperados para ingresar el acompañante."
+                    )
+            p.select_option("#documentoOpciones", companion_fields["#documentoOpciones"])
+            p.fill("#nroDocumento", companion_fields["#nroDocumento"])
+            p.fill("#apellido", companion_fields["#apellido"])
+            p.fill("#nombre", companion_fields["#nombre"])
+
         if p.locator("#enviarDatos").count():
             p.locator("#enviarDatos").click()
         else:
@@ -260,6 +299,26 @@ class CnrtClient:
             raise StructureChangedError(
                 "; ".join(alerts) if alerts else "CNRT no mostró la pantalla esperada de confirmación."
             )
+
+        if quantity == 2 and companion is not None:
+            expected_companion = {
+                "#documentoOpciones": companion.document_type.strip(),
+                "#nroDocumento": companion.document_number.strip(),
+                "#apellido": companion.surname.strip(),
+                "#nombre": companion.given_name.strip(),
+            }
+            for selector, expected in expected_companion.items():
+                field = p.locator(selector)
+                if not field.count():
+                    raise StructureChangedError(
+                        "CNRT abrió la confirmación pero no conservó todos los datos del acompañante."
+                    )
+                actual = field.input_value().strip()
+                if actual.casefold() != expected.casefold():
+                    raise StructureChangedError(
+                        "CNRT abrió la confirmación con datos del acompañante distintos de los ingresados."
+                    )
+
         return parse_confirmation_summary(html)
 
     def confirm_reservation(self, email: str) -> ConfirmationSummary:
