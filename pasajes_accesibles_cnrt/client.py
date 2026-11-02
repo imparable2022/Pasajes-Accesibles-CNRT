@@ -240,9 +240,38 @@ class CnrtClient:
         assert p is not None
         self._set_select2("#origen", origin)
         self._set_select2("#destino", destination)
+
+        # Escribir la fecha abre el bootstrap-datetimepicker de CNRT. En algunas
+        # fechas el calendario queda superpuesto sobre los radios de cantidad y
+        # Playwright no puede hacerles clic. Conservamos el llenado normal para
+        # que el widget valide la fecha y luego cerramos explícitamente el popup.
         p.fill("#fechaSalida", service.date.strftime("%d-%m-%Y"))
+        p.evaluate(
+            """() => {
+                const input = document.querySelector("#fechaSalida");
+                const jq = window.jQuery;
+                if (jq && input) {
+                    const picker = jq(input).data("DateTimePicker");
+                    if (picker && typeof picker.hide === "function") {
+                        picker.hide();
+                    }
+                }
+                const active = document.activeElement;
+                if (active && typeof active.blur === "function") {
+                    active.blur();
+                }
+            }"""
+        )
+
         qty_value = "dos" if quantity == 2 else "uno"
-        p.check(f"input[name='cantidadPasajes'][value='{qty_value}']")
+        qty = p.locator(f"input[name='cantidadPasajes'][value='{qty_value}']")
+        if not qty.count():
+            raise StructureChangedError(
+                "CNRT no mostró la opción esperada para la cantidad de pasajes."
+            )
+        # force=True evita depender de la geometría visual del formulario. El
+        # radio sigue recibiendo los eventos input/change de Playwright.
+        qty.check(force=True)
         p.locator("#reservar button[type='submit']").click()
         p.wait_for_load_state("domcontentloaded")
         selector = f"input[name='servicioARealizar_horario'][value='{service.radio_value}']"

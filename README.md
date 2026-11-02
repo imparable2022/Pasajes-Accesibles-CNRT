@@ -325,3 +325,9 @@ WCAG 3.0 sigue siendo un borrador y no se declara conformidad con un estándar t
 - Buscar pasajes incorpora **Mostrar** (`Alt + R`) con **Mostrar solo servicios libres** seleccionado por defecto y **Mostrar todos los servicios** como segunda opción.
 - Los servicios sin cupo aparecen claramente como no disponibles y nunca se permiten reservar.
 - Para evitar un atajo duplicado, **Buscar rango de fechas** pasa a `Alt + G`.
+
+### Versión 1.2.18
+
+- Corregido un bloqueo al preparar una reserva cuando el calendario emergente de CNRT quedaba abierto después de escribir la fecha y tapaba los botones de cantidad de pasajes.
+- La aplicación cierra explícitamente el selector de fecha antes de continuar.
+- La selección de **1** o **2 pasajes** ya no depende de que el botón de opción esté libre de superposiciones visuales, evitando el `Timeout 20000ms exceeded` observado al reservar con acompañante.
