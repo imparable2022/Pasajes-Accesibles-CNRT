@@ -74,6 +74,13 @@ class CredentialStore:
             pass
 
 
+class CompanionStore(CredentialStore):
+    """Datos opcionales del acompañante, cifrados con DPAPI en un archivo separado."""
+
+    def __init__(self, path: Path | None = None):
+        super().__init__(path or APP_DIR / "acompanante.dat")
+
+
 class DATA_BLOB(ctypes.Structure):
     _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_byte))]
 

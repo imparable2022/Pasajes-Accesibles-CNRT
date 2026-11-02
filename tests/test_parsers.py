@@ -74,6 +74,20 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(s.free_quota, 4)
         self.assertIn("EL NORTE", s.company)
 
+    def test_can_include_unavailable_services(self):
+        services = parse_available_services(
+            AVAILABLE,
+            date(2026, 10, 26),
+            include_unavailable=True,
+        )
+        self.assertEqual(len(services), 2)
+        unavailable = next(service for service in services if not service.available)
+        self.assertEqual(unavailable.service_id, "999")
+        self.assertEqual(unavailable.radio_value, "")
+        self.assertEqual(unavailable.company, "OTRA EMPRESA")
+        self.assertIn("NO DISPONIBLE", unavailable.unavailable_reason)
+        self.assertIn("NO DISPONIBLE", unavailable.display_text())
+
     def test_confirmation_summary(self):
         s = parse_confirmation_summary(CONFIRM)
         self.assertIn("RECONQUISTA", s.origin)

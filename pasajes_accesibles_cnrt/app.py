@@ -10,13 +10,13 @@ from datetime import date, datetime, timedelta
 import wx
 
 from . import __version__
-from .models import Locality, Profile, RequestRecord, ScanResult, Service
+from .models import Companion, Locality, Profile, RequestRecord, ScanResult, Service
 from .reservation_tracking import (
     ReservationLifecycleTracker,
     event_name_for_state,
     normalize_travel_date,
 )
-from .storage import CredentialStore
+from .storage import CompanionStore, CredentialStore
 from .telemetry import TelemetryClient, collect_technical_properties
 from .updater import GitHubUpdateService, UpdateError, UpdateInfo
 from .worker import CnrtWorker
@@ -86,6 +86,7 @@ class MainFrame(wx.Frame):
         super().__init__(None, title="Pasajes Accesibles CNRT", size=(900, 720))
         self.SetMinSize((760, 600))
         self.credential_store = CredentialStore()
+        self.companion_store = CompanionStore()
         self.high_contrast = _windows_high_contrast_enabled()
         self.visual_config = wx.Config("Pasajes Accesibles CNRT")
         try:
@@ -113,6 +114,7 @@ class MainFrame(wx.Frame):
         self.selected_origin: Locality | None = None
         self.selected_destination: Locality | None = None
         self.pending_service: Service | None = None
+        self.pending_companion: Companion | None = None
         self.selected_quantity: int = 1
         self.profile = Profile()
         self.last_scan_result: ScanResult | None = None
@@ -969,6 +971,17 @@ class MainFrame(wx.Frame):
         opts.Add(self.delay, 0)
         self.content_sizer.Add(opts, 0, wx.BOTTOM, 12)
 
+        self.show_services = wx.RadioBox(
+            self.content,
+            label="Most&rar",
+            choices=["Mostrar solo servicios libres", "Mostrar todos los servicios"],
+            majorDimension=1,
+            style=wx.RA_SPECIFY_ROWS,
+            name="Mostrar servicios",
+        )
+        self.show_services.SetSelection(0)
+        self.content_sizer.Add(self.show_services, 0, wx.EXPAND | wx.BOTTOM, 12)
+
         mode_box = wx.StaticBoxSizer(wx.VERTICAL, self.content, "Modo de búsqueda")
         self.mode_specific = wx.RadioButton(
             mode_box.GetStaticBox(),
@@ -978,7 +991,7 @@ class MainFrame(wx.Frame):
         )
         self.mode_range = wx.RadioButton(
             mode_box.GetStaticBox(),
-            label="Buscar &rango de fechas",
+            label="Buscar ran&go de fechas",
             name="Buscar rango de fechas",
         )
         self.mode_all = wx.RadioButton(
@@ -1055,6 +1068,7 @@ class MainFrame(wx.Frame):
             "origin": self.selected_origin,
             "destination": self.selected_destination,
             "quantity_index": self.quantity.GetSelection(),
+            "show_services_index": self.show_services.GetSelection(),
             "delay": float(self.delay.GetValue()),
             "mode": mode,
             "travel_date": self.travel_date.GetValue(),
@@ -1084,6 +1098,9 @@ class MainFrame(wx.Frame):
         quantity_index = int(state.get("quantity_index", 0))
         if 0 <= quantity_index < self.quantity.GetCount():
             self.quantity.SetSelection(quantity_index)
+        show_services_index = int(state.get("show_services_index", 0))
+        if 0 <= show_services_index < self.show_services.GetCount():
+            self.show_services.SetSelection(show_services_index)
         self.delay.SetValue(float(state.get("delay", 0.9)))
 
         mode = state.get("mode", "specific")
@@ -1652,6 +1669,7 @@ class MainFrame(wx.Frame):
             origin=self.selected_origin,
             destination=self.selected_destination,
             quantity=self.selected_quantity,
+            include_unavailable=self.show_services.GetSelection() == 1,
             delay_seconds=float(self.delay.GetValue()),
             progress=self._scan_progress,
             cancel_event=self.scan_cancel_event,
@@ -1693,11 +1711,17 @@ class MainFrame(wx.Frame):
     def _show_results(self, result: ScanResult):
         self._clear_content()
         self._heading("Resultados de búsqueda")
-        summary = f"Fechas revisadas: {result.scanned_dates}. Fechas con disponibilidad: {result.available_dates}. Servicios disponibles: {len(result.services)}."
+        summary = (
+            f"Fechas revisadas: {result.scanned_dates}. "
+            f"Fechas con disponibilidad: {result.available_dates}. "
+            f"Servicios disponibles: {result.available_services}."
+        )
+        if len(result.services) != result.available_services:
+            summary += f" Servicios mostrados: {len(result.services)}."
         if result.cancelled:
             summary += " La búsqueda fue cancelada antes de terminar."
         self.content_sizer.Add(wx.StaticText(self.content, label=summary), 0, wx.BOTTOM, 8)
-        self.results_list = wx.ListBox(self.content, choices=[s.display_text() for s in result.services], name="Servicios disponibles")
+        self.results_list = wx.ListBox(self.content, choices=[s.display_text() for s in result.services], name="Servicios encontrados")
         self.content_sizer.Add(self.results_list, 1, wx.EXPAND | wx.BOTTOM, 10)
         row = wx.WrapSizer(wx.HORIZONTAL)
         reserve = wx.Button(self.content, label="&Reservar servicio seleccionado")
@@ -1735,7 +1759,16 @@ class MainFrame(wx.Frame):
         if idx == wx.NOT_FOUND:
             wx.MessageBox("Seleccione un servicio.", "Reserva", wx.OK | wx.ICON_INFORMATION)
             return
-        self.pending_service = self.scan_services[idx]
+        selected = self.scan_services[idx]
+        if not selected.available:
+            wx.MessageBox(
+                selected.unavailable_reason or "Este servicio no tiene cupo disponible.",
+                "Servicio no disponible",
+                wx.OK | wx.ICON_INFORMATION,
+            )
+            self._announce("El servicio seleccionado se muestra como no disponible y no puede reservarse.")
+            return
+        self.pending_service = selected
         self._show_preference()
 
     def _show_preference(self):
@@ -1749,6 +1782,47 @@ class MainFrame(wx.Frame):
         self.reason = wx.TextCtrl(self.content, name="Motivo de preferencia")
         self.reason.SetMaxLength(30)
         self.content_sizer.Add(self.reason, 0, wx.EXPAND | wx.BOTTOM, 10)
+
+        if self.selected_quantity == 2:
+            companion_box = wx.StaticBoxSizer(wx.VERTICAL, self.content, "Datos del acompañante")
+            companion_parent = companion_box.GetStaticBox()
+            companion_grid = wx.FlexGridSizer(cols=2, vgap=8, hgap=12)
+            companion_grid.AddGrowableCol(1, 1)
+
+            companion_grid.Add(wx.StaticText(companion_parent, label="Tipo de documento"), 0, wx.ALIGN_CENTER_VERTICAL)
+            self.companion_doc_type = wx.Choice(
+                companion_parent,
+                choices=[x[0] for x in DOC_TYPES],
+                name="Tipo de documento del acompañante",
+            )
+            self.companion_doc_type.SetSelection(0)
+            companion_grid.Add(self.companion_doc_type, 1, wx.EXPAND)
+
+            companion_grid.Add(wx.StaticText(companion_parent, label="Número de documento"), 0, wx.ALIGN_CENTER_VERTICAL)
+            self.companion_doc_number = wx.TextCtrl(companion_parent, name="Número de documento del acompañante")
+            companion_grid.Add(self.companion_doc_number, 1, wx.EXPAND)
+
+            companion_grid.Add(wx.StaticText(companion_parent, label="Apellido"), 0, wx.ALIGN_CENTER_VERTICAL)
+            self.companion_surname = wx.TextCtrl(companion_parent, name="Apellido del acompañante")
+            companion_grid.Add(self.companion_surname, 1, wx.EXPAND)
+
+            companion_grid.Add(wx.StaticText(companion_parent, label="Nombre"), 0, wx.ALIGN_CENTER_VERTICAL)
+            self.companion_given_name = wx.TextCtrl(companion_parent, name="Nombre del acompañante")
+            companion_grid.Add(self.companion_given_name, 1, wx.EXPAND)
+
+            companion_box.Add(companion_grid, 0, wx.EXPAND | wx.ALL, 8)
+            self.remember_companion = wx.CheckBox(
+                companion_parent,
+                label="Recordar datos del acompañante de forma cifrada en este usuario de Windows",
+                name="Recordar datos del acompañante",
+            )
+            companion_box.Add(self.remember_companion, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+            forget_companion = wx.Button(companion_parent, label="Olvidar datos guardados del acompañante")
+            forget_companion.Bind(wx.EVT_BUTTON, self.on_clear_companion_data)
+            companion_box.Add(forget_companion, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+            self.content_sizer.Add(companion_box, 0, wx.EXPAND | wx.BOTTOM, 10)
+            self._load_companion_data()
+
         row = wx.WrapSizer(wx.HORIZONTAL)
         prepare = wx.Button(self.content, label="Preparar reserva")
         prepare.Bind(wx.EVT_BUTTON, self.on_prepare)
@@ -1762,6 +1836,33 @@ class MainFrame(wx.Frame):
         self.content.Layout()
         self.preference.SetFocus()
 
+    def _load_companion_data(self):
+        try:
+            data = self.companion_store.load()
+        except Exception as exc:
+            self._announce(f"No se pudieron leer los datos guardados del acompañante: {exc}")
+            return
+        if not data:
+            return
+        self._select_value(self.companion_doc_type, DOC_TYPES, data.get("document_type", "1"))
+        self.companion_doc_number.SetValue(data.get("document_number", ""))
+        self.companion_surname.SetValue(data.get("surname", ""))
+        self.companion_given_name.SetValue(data.get("given_name", ""))
+        self.remember_companion.SetValue(True)
+
+    def on_clear_companion_data(self, event=None):
+        self.companion_store.clear()
+        if hasattr(self, "remember_companion"):
+            self.remember_companion.SetValue(False)
+        for name in ("companion_doc_number", "companion_surname", "companion_given_name"):
+            control = getattr(self, name, None)
+            if control is not None:
+                control.SetValue("")
+        if hasattr(self, "companion_doc_type"):
+            self.companion_doc_type.SetSelection(0)
+            self.companion_doc_number.SetFocus()
+        self._announce("Datos guardados del acompañante eliminados.")
+
     def on_prepare(self, event):
         if not (self.selected_origin and self.selected_destination and self.pending_service):
             return
@@ -1771,6 +1872,48 @@ class MainFrame(wx.Frame):
         # Por eso obtenemos el perfil ANTES de preparar la reserva.
         preference = "1" if self.preference.GetSelection() == 0 else "2"
         reason = self.reason.GetValue()
+        companion = None
+        if self.selected_quantity == 2:
+            document_number = self.companion_doc_number.GetValue().strip()
+            surname = self.companion_surname.GetValue().strip()
+            given_name = self.companion_given_name.GetValue().strip()
+            for control, value, message in (
+                (self.companion_doc_number, document_number, "Ingrese el número de documento del acompañante."),
+                (self.companion_surname, surname, "Ingrese el apellido del acompañante."),
+                (self.companion_given_name, given_name, "Ingrese el nombre del acompañante."),
+            ):
+                if not value:
+                    wx.MessageBox(message, "Falta un dato del acompañante", wx.OK | wx.ICON_WARNING)
+                    control.SetFocus()
+                    return
+            companion = Companion(
+                document_type=DOC_TYPES[self.companion_doc_type.GetSelection()][1],
+                document_number=document_number,
+                surname=surname,
+                given_name=given_name,
+            )
+            self.pending_companion = companion
+            if self.remember_companion.GetValue():
+                try:
+                    self.companion_store.save(
+                        {
+                            "document_type": companion.document_type,
+                            "document_number": companion.document_number,
+                            "surname": companion.surname,
+                            "given_name": companion.given_name,
+                        }
+                    )
+                except Exception as exc:
+                    wx.MessageBox(
+                        f"No se pudieron guardar los datos del acompañante de forma segura: {exc}",
+                        "Aviso",
+                        wx.OK | wx.ICON_WARNING,
+                    )
+            else:
+                self.companion_store.clear()
+        else:
+            self.pending_companion = None
+
         self._busy("Leyendo el correo y revalidando el servicio...")
         self.worker.submit(
             "get_profile",
@@ -1778,11 +1921,19 @@ class MainFrame(wx.Frame):
                 profile if not err else Profile(),
                 preference,
                 reason,
+                companion,
                 err,
             ),
         )
 
-    def _after_profile_for_prepare(self, profile: Profile, preference: str, reason: str, profile_error):
+    def _after_profile_for_prepare(
+        self,
+        profile: Profile,
+        preference: str,
+        reason: str,
+        companion: Companion | None,
+        profile_error,
+    ):
         if profile_error:
             # El correo también puede escribirse manualmente en la pantalla final.
             # Continuamos porque prepare_reservation abre de nuevo la búsqueda y,
@@ -1797,6 +1948,7 @@ class MainFrame(wx.Frame):
             self.selected_quantity,
             preference,
             reason,
+            companion,
             callback=lambda summary, err: self._after_prepare(summary, err, profile),
         )
 
@@ -1815,6 +1967,16 @@ class MainFrame(wx.Frame):
         self._clear_content()
         self._heading("Confirmación final")
         self.content_sizer.Add(wx.StaticText(self.content, label=summary.spoken_summary() or summary.raw_text[:1000]), 0, wx.EXPAND | wx.BOTTOM, 10)
+        if self.pending_companion is not None:
+            document_label = next(
+                (label for label, value in DOC_TYPES if value == self.pending_companion.document_type),
+                "Documento",
+            )
+            companion_summary = (
+                f"Acompañante: {self.pending_companion.surname}, {self.pending_companion.given_name}. "
+                f"{document_label}: {self.pending_companion.document_number}."
+            )
+            self.content_sizer.Add(wx.StaticText(self.content, label=companion_summary), 0, wx.EXPAND | wx.BOTTOM, 10)
         self.content_sizer.Add(wx.StaticText(self.content, label="Correo donde la empresa enviará el pasaje"), 0)
         self.confirm_email = wx.TextCtrl(self.content, value=profile.email, name="Correo para recibir el pasaje")
         self.content_sizer.Add(self.confirm_email, 0, wx.EXPAND | wx.BOTTOM, 10)

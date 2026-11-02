@@ -21,6 +21,14 @@ class SearchConstraints:
 
 
 @dataclass(frozen=True)
+class Companion:
+    document_type: str = "1"
+    document_number: str = ""
+    surname: str = ""
+    given_name: str = ""
+
+
+@dataclass(frozen=True)
 class Service:
     date: date
     company: str
@@ -32,6 +40,8 @@ class Service:
     service_id: str
     radio_value: str
     info: str = ""
+    available: bool = True
+    unavailable_reason: str = ""
 
     @property
     def free_quota(self) -> Optional[int]:
@@ -43,9 +53,10 @@ class Service:
         free = ""
         if self.free_quota is not None:
             free = f", cupo libre estimado {self.free_quota}"
+        status = "Disponible" if self.available else (self.unavailable_reason or "No disponible")
         return (
             f"{self.date.strftime('%d/%m/%Y')} - {self.company}. "
-            f"Sale {self.departure}, llega {self.arrival}. {self.category}{free}."
+            f"Sale {self.departure}, llega {self.arrival}. {self.category}{free}. {status}."
         )
 
 
@@ -58,7 +69,11 @@ class ScanResult:
 
     @property
     def available_dates(self) -> int:
-        return len({s.date for s in self.services})
+        return len({s.date for s in self.services if s.available})
+
+    @property
+    def available_services(self) -> int:
+        return sum(1 for s in self.services if s.available)
 
 
 @dataclass(frozen=True)

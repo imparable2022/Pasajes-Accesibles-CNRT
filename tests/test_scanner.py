@@ -9,7 +9,12 @@ AVAILABLE = """
 <html><body><div id='id_1'>EMPRESA PRUEBA
 <div><label for='100_10:00'>Sale 10:00 - Llega 12:00<br>Categoría: Semicama<br>Solicitados: 0<br>Cupo Total: 4</label></div>
 <div><input id='100_10:00' type='radio' name='servicioARealizar_horario' value='100_10:00'></div>
-</div></body></html>
+</div>
+<p id='id_2'><input type='hidden' id='servicio_a_realizar' value='200' disabled>
+OTRA EMPRESA
+<label>Sale 13:00 - Llega 15:00<br>Categoría: Semicama<br>Solicitados: 4<br>Cupo Total: 4</label>
+<div class='alert alert-danger'>NO DISPONIBLE - CUPO CUBIERTO</div></p>
+</body></html>
 """
 NO_AVAILABLE = "<html><body><div class='alert alert-danger'>NO DISPONIBLE - CUPO CUBIERTO</div></body></html>"
 
@@ -43,6 +48,21 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(len(c.calls), 5)
         self.assertEqual(result.available_dates, 2)
         self.assertEqual([s.date for s in result.services], [date(2026, 10, 2), date(2026, 10, 4)])
+
+    def test_can_collect_unavailable_services_without_counting_them_as_available(self):
+        c = FakeClient()
+        result = c.scan_availability(
+            Locality('1', 'ORIGEN'),
+            Locality('2', 'DESTINO'),
+            include_unavailable=True,
+            start_date=date(2026, 10, 1),
+            end_date=date(2026, 10, 5),
+            delay_seconds=0,
+        )
+        self.assertEqual(len(result.services), 4)
+        self.assertEqual(result.available_services, 2)
+        self.assertEqual(result.available_dates, 2)
+        self.assertEqual(sum(1 for s in result.services if not s.available), 2)
 
 
 if __name__ == '__main__':
