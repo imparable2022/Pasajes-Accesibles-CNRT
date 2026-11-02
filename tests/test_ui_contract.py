@@ -44,12 +44,20 @@ class SearchUiContractTests(unittest.TestCase):
 
     def test_search_mode_uses_radio_buttons_with_requested_shortcuts(self):
         self.assertIn('label="Buscar fecha e&specífica"', SOURCE)
-        self.assertIn('label="Buscar &rango de fechas"', SOURCE)
+        self.assertIn('label="Buscar ran&go de fechas"', SOURCE)
         self.assertIn('label="Escanear todas las fechas disponibl&es"', SOURCE)
         self.assertIn('name="Escanear todas las fechas disponibles"', SOURCE)
         self.assertIn('style=wx.RB_GROUP', SOURCE)
         self.assertIn('wx.EVT_RADIOBUTTON', SOURCE)
         self.assertNotIn('Limitar el escaneo a un rango de fechas', SOURCE)
+
+    def test_search_screen_has_show_filter_with_alt_r_and_free_only_default(self):
+        self.assertIn('self.show_services = wx.RadioBox(', SOURCE)
+        self.assertIn('label="Most&rar"', SOURCE)
+        self.assertIn('choices=["Mostrar solo servicios libres", "Mostrar todos los servicios"]', SOURCE)
+        self.assertIn('self.show_services.SetSelection(0)', SOURCE)
+        self.assertIn('include_unavailable=self.show_services.GetSelection() == 1', SOURCE)
+        self.assertIn('"show_services_index": self.show_services.GetSelection()', SOURCE)
 
     def test_only_controls_for_selected_mode_are_shown(self):
         self.assertIn('self.specific_panel.Show(specific)', SOURCE)
@@ -122,6 +130,21 @@ class SearchUiContractTests(unittest.TestCase):
         self.assertIn('saved_search = self._last_search_form if restore_previous else None', SOURCE)
         self.assertIn('self._restore_search_form(saved_search)', SOURCE)
         self.assertIn('self._last_search_form = None', SOURCE)
+
+    def test_two_passages_expose_companion_fields_and_secure_remember_option(self):
+        self.assertIn('"Datos del acompañante"', SOURCE)
+        self.assertIn('name="Número de documento del acompañante"', SOURCE)
+        self.assertIn('name="Apellido del acompañante"', SOURCE)
+        self.assertIn('name="Nombre del acompañante"', SOURCE)
+        self.assertIn('name="Recordar datos del acompañante"', SOURCE)
+        self.assertIn('self.companion_store.save(', SOURCE)
+        self.assertIn('self.companion_store.clear()', SOURCE)
+        self.assertIn('companion = Companion(', SOURCE)
+
+    def test_unavailable_result_cannot_be_reserved(self):
+        self.assertIn('if not selected.available:', SOURCE)
+        self.assertIn('"Servicio no disponible"', SOURCE)
+        self.assertIn('no puede reservarse', SOURCE)
 
     def test_secondary_views_keep_a_meaningful_back_path(self):
         self.assertGreaterEqual(SOURCE.count('label="Volver a &resultados"'), 2)
