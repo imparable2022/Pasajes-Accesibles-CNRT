@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - "v*"
 
 permissions:
   contents: write
@@ -115,4 +117,5 @@ jobs:
           gh release create "${{ github.ref_name }}" `
             $installer "$installer.sha256" `
             $portable "$portable.sha256" `
+            --target "6576501cbb6afa972d68d84dd27ddc9f96a1dc32" `
             --title "Pasajes Accesibles CNRT $version" --generate-notes
