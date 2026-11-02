@@ -16,7 +16,7 @@ Si en el futuro fuera necesario impedir que terceros fabriquen eventos usando el
 
 El archivo `.gitignore` excluye entornos virtuales, archivos `.env`, claves/certificados, logs, volcados, bases de datos y otros archivos locales que no deben publicarse.
 
-Los datos persistentes de la aplicación se almacenan fuera del repositorio, bajo la carpeta de datos de usuario de Windows. Las credenciales que una persona elige recordar se protegen mediante DPAPI y no forman parte del código fuente.
+Los datos persistentes de la aplicación se almacenan fuera del repositorio, bajo la carpeta de datos de usuario de Windows. Las credenciales y los datos del acompañante que una persona elige recordar se protegen mediante DPAPI y no forman parte del código fuente. Se almacenan en archivos cifrados separados para que borrar las credenciales de ingreso no elimine por accidente al acompañante recordado.
 
 ## Antes de publicar
 
