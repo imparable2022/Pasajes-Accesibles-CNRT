@@ -22,8 +22,9 @@ Si el programa   te sirve y te gustaría colaborar conmigo para que pueda seguir
 - **Recordar credenciales (opcional):** Si querés, podés hacer que el programa recuerde tus datos de ingreso para no tener que escribirlos cada vez que uses el programa.
 - **Buscar sin complicaciones:** Escribís tu origen y destino, y el programa te va a ir sugiriendo las localidades.
 - **Búsquedas a tu medida:** Buscás pasajes para un día específico, revisás un rango de varios días o escaneás todas las fechas que la CNRT tenga habilitadas para el origen y destino que ingreses.
-- **Resultados útiles:** El programa solo te va a mostrar los servicios que realmente tengan lugares disponibles.
-- **Reservas seguras:** Antes de confirmar, el programa vuelve a verificar en tiempo real que el asiento siga libre.
+- **Resultados a tu medida:** Por defecto el programa muestra solamente los servicios con lugares disponibles, pero también podés elegir **Mostrar todos los servicios** para consultar los que ya tienen el cupo cubierto.
+- **Reservas seguras:** Antes de confirmar, el programa vuelve a verificar en tiempo real que el lugar siga disponible. Los servicios sin cupo pueden mostrarse como información, pero no se pueden reservar.
+- **Acompañante:** Si solicitás dos pasajes, el programa pide los datos del acompañante que exige CNRT y puede recordarlos de forma cifrada para futuras reservas.
 - **Personalizá tu viaje:** Elegís si preferís viajar en planta baja o alta y especificás el motivo.
 - **Gestioná tus pasajes:** En la sección **Mis solicitudes** vas a poder leer todos los detalles de tus pasajes y gestionarlos.
 
@@ -53,7 +54,7 @@ Si preferís ejecutar el código directamente, necesitás Python (3.10, 3.11 o 3
 
 ## Privacidad y seguridad
 
-- **Tus datos están protegidos:** Si decidís activar la opción **Recordar credenciales**, tu documento y número de pase se cifran con la máxima seguridad de Windows (DPAPI) y quedan atados únicamente a tu usuario de la computadora.
+- **Tus datos están protegidos:** Si decidís activar **Recordar credenciales** o **Recordar datos del acompañante**, esos datos se cifran con la protección DPAPI de Windows y quedan vinculados a tu usuario de la computadora. Las credenciales y el acompañante se guardan por separado.
 - **Estadísticas opcionales y anónimas:** Para ayudarme a mejorar el programa, podés elegir enviarme estadísticas de uso. Si lo activás desde el menú de Ayuda, solamente se van a enviar datos técnicos (versión de Windows, qué lector de pantalla o ajuste de accesibilidad usás), así puedo seguir mejorándolo para que las personas tengan o no una discapacidad puedan usarlo mejor.
 
 ## Cómo sacar un pasaje
@@ -65,12 +66,14 @@ Después seleccioná la localidad de **Origen** y **Destino** (podés escribir e
 Luego, elegí una de las **3 formas de búsqueda disponibles**:
 
 1. **Buscar fecha específica (`Alt + S`):** Te permite consultar un día puntual. Podés escribir la fecha en formato `DD-MM-AAAA` (ej. `15-10-2026`) o usar los cuadros de día, mes y año. Dentro del cuadro de fecha, podés cambiar de día rápido con las flechas **Arriba/Abajo**.
-2. **Buscar rango de fechas (`Alt + R`):** Podés elegir una fecha de inicio y una de fin para consultar varios días seguidos (ej. del `10-10-2026` al `15-10-2026`).
+2. **Buscar rango de fechas (`Alt + G`):** Podés elegir una fecha de inicio y una de fin para consultar varios días seguidos (ej. del `10-10-2026` al `15-10-2026`).
 3. **Escanear todas las fechas disponibles (`Alt + E`):** Revisa de forma automática todas las fechas permitidas por la CNRT para el origen y destino que coloques.
 
-Para iniciar la búsqueda presioná **Alt + F**. El programa solo te va a mostrar los servicios que tengan pasajes libres. Al terminar de buscar, el foco del teclado salta automáticamente a la lista de resultados.
+En **Mostrar (`Alt + R`)** tenés dos botones de opción: **Mostrar solo servicios libres**, seleccionado por defecto, y **Mostrar todos los servicios**. En este segundo modo también aparecen los servicios que CNRT marca como no disponibles, identificados claramente y sin posibilidad de reservarlos.
 
-Elegí tu asiento (planta baja o alta) y presioná el botón de envío para confirmar la reserva.
+Para iniciar la búsqueda presioná **Alt + F**. Al terminar, el foco del teclado salta automáticamente a la lista de resultados.
+
+Elegí tu asiento (planta baja o alta). Si pediste dos pasajes, completá los datos del acompañante: tipo y número de documento, apellido y nombre. Podés marcar **Recordar datos del acompañante** para que se carguen automáticamente en próximas reservas. Luego prepará la reserva, revisá la confirmación y enviá la solicitud.
 
 ## Cómo gestionar "Mis solicitudes"
 
@@ -308,3 +311,17 @@ WCAG 3.0 sigue siendo un borrador y no se declara conformidad con un estándar t
 - Los enlaces de descarga del README usan `releases/latest/download`, por lo que siempre apuntan a la última versión estable sin tener que modificar el enlace.
 - El actualizador interno usa los mismos nombres fijos para encontrar futuras actualizaciones.
 - Se mantiene la verificación SHA-256 tanto para el instalador como para la versión portátil.
+
+### Versión 1.2.16
+
+- Se añadió **Limpiar datos** (`Alt + L`) en Buscar pasajes para vaciar origen, destino y fechas sin borrar credenciales ni otras preferencias.
+- Resultados y confirmación ofrecen **Volver a buscar pasajes** y restauran la búsqueda anterior cuando corresponde.
+
+### Versión 1.2.17
+
+- Las reservas de dos pasajes completan los cuatro datos de acompañante exigidos por CNRT: tipo de documento, número, apellido y nombre.
+- Antes de llegar a la confirmación, la aplicación verifica que CNRT haya conservado esos datos.
+- Se puede **Recordar datos del acompañante** de forma opcional; se guardan cifrados con DPAPI en un archivo separado de las credenciales de ingreso.
+- Buscar pasajes incorpora **Mostrar** (`Alt + R`) con **Mostrar solo servicios libres** seleccionado por defecto y **Mostrar todos los servicios** como segunda opción.
+- Los servicios sin cupo aparecen claramente como no disponibles y nunca se permiten reservar.
+- Para evitar un atajo duplicado, **Buscar rango de fechas** pasa a `Alt + G`.
