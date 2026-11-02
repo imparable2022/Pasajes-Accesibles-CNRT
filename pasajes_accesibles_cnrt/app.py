@@ -1838,7 +1838,7 @@ class MainFrame(wx.Frame):
             companion_box.Add(companion_grid, 0, wx.EXPAND | wx.ALL, 8)
             self.remember_companion = wx.CheckBox(
                 companion_parent,
-                label="Recordar datos del acompañante de forma cifrada en este usuario de Windows",
+                label="Recordar datos del acompañante",
                 name="Recordar datos del acompañante",
             )
             companion_box.Add(self.remember_companion, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
