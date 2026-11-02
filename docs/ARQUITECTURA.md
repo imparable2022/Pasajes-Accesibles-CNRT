@@ -19,8 +19,8 @@ La interfaz accesible y la sesión web están separadas. La persona utiliza cont
 1. Se inicia sesión normalmente en `/web/ingresar`.
 2. Se obtiene el enlace real de `Solicitar Pasaje` y los campos ocultos de sesión.
 3. Para cada fecha se envía una búsqueda a `/web/buscarServicios` utilizando las mismas cookies de la sesión de navegador.
-4. El HTML de respuesta se analiza buscando `input[name='servicioARealizar_horario']`.
-5. Solo los servicios que poseen ese control se consideran seleccionables.
+4. El HTML de respuesta se analiza por los bloques de servicio publicados por CNRT.
+5. Los servicios que poseen `input[name='servicioARealizar_horario']` se consideran seleccionables. Si el usuario elige **Mostrar todos los servicios**, también se leen los bloques que CNRT marca como no disponibles, pero quedan con `available=False` y sin valor de radio para impedir su reserva.
 6. Las consultas se ejecutan una por una con una pausa configurable, nunca en paralelo.
 
 ## Flujo de reserva
@@ -29,14 +29,15 @@ La interfaz accesible y la sesión web están separadas. La persona utiliza cont
 2. Antes de continuar se repite la consulta para esa fecha.
 3. Si el `radio_value` elegido ya no existe, la reserva se detiene.
 4. Se abre el formulario oficial, se selecciona origen, destino, fecha y servicio.
-5. CNRT genera su pantalla oficial de confirmación.
-6. La aplicación presenta el resumen al usuario.
-7. Solo una segunda confirmación explícita hace POST a `/web/confirmarReserva`.
-8. El resultado se considera exitoso únicamente si la respuesta contiene `Solicitud Confirmada`.
+5. Cuando la solicitud es por dos pasajes, se completan tipo y número de documento, apellido y nombre del acompañante antes de enviar el formulario de selección.
+6. CNRT genera su pantalla oficial de confirmación. Para dos pasajes, la aplicación verifica además que los cuatro datos del acompañante hayan sido conservados por CNRT.
+7. La aplicación presenta el resumen al usuario.
+8. Solo una segunda confirmación explícita hace POST a `/web/confirmarReserva`.
+9. El resultado se considera exitoso únicamente si la respuesta contiene `Solicitud Confirmada`.
 
 ## Datos sensibles
 
-Los tokens y el identificador interno de beneficiario se leen de la sesión activa y nunca se persisten. Si se habilita recordar credenciales, DPAPI cifra el JSON y lo vincula al usuario de Windows.
+Los tokens y el identificador interno de beneficiario se leen de la sesión activa y nunca se persisten. Si se habilita recordar credenciales o acompañante, DPAPI cifra cada JSON y lo vincula al usuario de Windows. Credenciales y acompañante usan archivos separados.
 
 
 ## Flujo de Mis Solicitudes
