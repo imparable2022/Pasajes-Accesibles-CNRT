@@ -337,3 +337,8 @@ WCAG 3.0 sigue siendo un borrador y no se declara conformidad con un estándar t
 - Se simplificó el diálogo **Actualización disponible** para mostrar solamente la versión instalada, una sección **¿Qué hay de nuevo?** y la pregunta para actualizar.
 - Las notas generadas automáticamente por GitHub se limpian antes de mostrarse: se omiten encabezados, autores, enlaces y el enlace de comparación completa, y se priorizan los cambios de la versión nueva.
 - El diálogo **Actualización portable lista** usa un texto más simple y confirma que los datos guardados no se borrarán, sin exponer detalles técnicos como SHA-256 al usuario.
+
+### Versión 1.2.20
+
+- La casilla del acompañante ahora se muestra simplemente como **Recordar datos del acompañante**.
+- El almacenamiento continúa cifrado internamente; solo se simplificó el texto visible.

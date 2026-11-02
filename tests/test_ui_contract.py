@@ -137,6 +137,8 @@ class SearchUiContractTests(unittest.TestCase):
         self.assertIn('name="Apellido del acompañante"', SOURCE)
         self.assertIn('name="Nombre del acompañante"', SOURCE)
         self.assertIn('name="Recordar datos del acompañante"', SOURCE)
+        self.assertIn('label="Recordar datos del acompañante"', SOURCE)
+        self.assertNotIn("Recordar datos del acompañante de forma cifrada en este usuario de Windows", SOURCE)
         self.assertIn('self.companion_store.save(', SOURCE)
         self.assertIn('self.companion_store.clear()', SOURCE)
         self.assertIn('companion = Companion(', SOURCE)
