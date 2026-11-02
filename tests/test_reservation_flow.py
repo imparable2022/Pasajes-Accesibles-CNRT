@@ -32,6 +32,14 @@ class ReservationFlowRegressionTests(unittest.TestCase):
         self.assertNotIn('"get_profile"', after_prepare.group("body"))
         self.assertIn("self._show_confirmation(summary, profile)", after_prepare.group("body"))
 
+    def test_datepicker_is_closed_before_quantity_and_quantity_uses_force(self):
+        client = (Path(__file__).resolve().parents[1] / "pasajes_accesibles_cnrt" / "client.py").read_text(encoding="utf-8")
+        self.assertIn('p.fill("#fechaSalida"', client)
+        self.assertIn('data("DateTimePicker")', client)
+        self.assertIn('picker.hide()', client)
+        self.assertIn('qty.check(force=True)', client)
+        self.assertIn('"CNRT no mostró la opción esperada para la cantidad de pasajes."', client)
+
     def test_two_passage_reservation_sends_and_verifies_companion(self):
         client = (Path(__file__).resolve().parents[1] / "pasajes_accesibles_cnrt" / "client.py").read_text(encoding="utf-8")
         self.assertIn("companion: Optional[Companion] = None", client)
