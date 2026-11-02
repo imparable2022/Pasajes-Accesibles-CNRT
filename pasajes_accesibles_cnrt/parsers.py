@@ -22,73 +22,106 @@ def parse_constraints(html: str) -> SearchConstraints:
     )
 
 
-def parse_available_services(html: str, travel_date: date) -> list[Service]:
+def parse_available_services(
+    html: str,
+    travel_date: date,
+    include_unavailable: bool = False,
+) -> list[Service]:
+    """Lee los servicios publicados por CNRT.
+
+    Por compatibilidad, de forma predeterminada devuelve solamente los servicios
+    seleccionables. Con include_unavailable=True también incorpora los bloques
+    que CNRT marca como NO DISPONIBLE, pero con available=False y sin radio_value.
+    """
     soup = BeautifulSoup(html, "html.parser")
     result: list[Service] = []
-    for radio in soup.select("input[name='servicioARealizar_horario']"):
-        value = radio.get("value", "")
-        if not value:
+
+    for container in soup.find_all(id=re.compile(r"^id_\d+$")):
+        radio = container.select_one("input[name='servicioARealizar_horario']")
+        available = radio is not None
+        if not available and not include_unavailable:
             continue
-        container = radio.find_parent(id=re.compile(r"^id_")) or radio.parent
-        label = None
-        radio_id = radio.get("id")
-        if radio_id:
-            label = soup.find("label", attrs={"for": radio_id})
-        label_text = _clean(label.get_text(" ", strip=True) if label else container.get_text(" ", strip=True))
+
+        if radio is not None:
+            radio_value = radio.get("value", "")
+            radio_id = radio.get("id")
+            label = soup.find("label", attrs={"for": radio_id}) if radio_id else None
+        else:
+            radio_value = ""
+            label = container.find("label")
+
+        if not label:
+            continue
+
+        label_text = _clean(label.get_text(" ", strip=True))
         departure = _first(label_text, r"Sale\s+(\d{1,2}:\d{2})")
         arrival = _first(label_text, r"Llega\s+(\d{1,2}:\d{2})")
-        category = _first(label_text, r"Categor(?:í|&iacute;|i)a:\s*([^:]+?)(?=\s+(?:\d+\s+)*Solicitados:|\s+(?:\d+\s+)*Cupo Total:|$)") or "Sin categoría informada"
+        if not departure and not arrival:
+            continue
+
+        category = _first(
+            label_text,
+            r"Categor(?:í|&iacute;|i)a:\s*([^:]+?)(?=\s+(?:\d+\s+)*Solicitados:|\s+(?:\d+\s+)*Cupo Total:|$)",
+        ) or "Sin categoría informada"
         category = re.sub(r"\s+\d+$", "", category).strip()
         requested = _int_or_none(_first(label_text, r"Solicitados:\s*(\d+)"))
         total = _int_or_none(_first(label_text, r"Cupo Total:\s*(\d+)"))
 
         company = "Empresa no informada"
-        if container:
-            # En la página real, el nombre de empresa está antes del label del servicio.
-            direct_text = []
-            for child in container.children:
-                if getattr(child, "name", None) == "input":
-                    continue
-                if getattr(child, "name", None) == "div" and child.find("label"):
-                    break
-                if isinstance(child, str):
-                    t = _clean(child)
-                    if t and not t.isdigit():
-                        direct_text.append(t)
-                elif getattr(child, "get_text", None) and not child.find("label"):
-                    t = _clean(child.get_text(" ", strip=True))
-                    if t and not t.isdigit():
-                        direct_text.append(t)
-            if direct_text:
-                company = direct_text[-1]
+        direct_text: list[str] = []
+        for child in container.children:
+            if child is label:
+                break
+            if getattr(child, "find", None) and child.find("label"):
+                break
+            if isinstance(child, str):
+                value = _clean(child)
+            elif getattr(child, "name", None) in {"input", "br"}:
+                value = ""
+            elif getattr(child, "get_text", None):
+                value = _clean(child.get_text(" ", strip=True))
             else:
-                text = _clean(container.get_text(" ", strip=True))
-                m = re.search(r"(?:^|\s)(.+?)\s+Sale\s+\d{1,2}:\d{2}", text)
-                if m:
-                    candidate = _clean(m.group(1))
-                    candidate = re.sub(r"^\d+\s+", "", candidate)
-                    if candidate:
-                        company = candidate
+                value = ""
+            if (
+                value
+                and not value.isdigit()
+                and "NO DISPONIBLE" not in value.upper()
+                and not value.startswith("Sale ")
+            ):
+                direct_text.append(value)
+        if direct_text:
+            company = direct_text[-1]
 
-        info_node = container.select_one("input#infoservicio") if container else None
+        info_node = container.select_one("input#infoservicio")
         info = info_node.get("value", "") if info_node else ""
-        service_id = value.split("_", 1)[0]
+
+        if available:
+            service_id = radio_value.split("_", 1)[0]
+            unavailable_reason = ""
+        else:
+            hidden_service = container.select_one("input#servicio_a_realizar")
+            service_id = hidden_service.get("value", "") if hidden_service else ""
+            alert = container.select_one(".alert-danger, .alert-warning")
+            unavailable_reason = _clean(alert.get_text(" ", strip=True)) if alert else "No disponible"
+
         result.append(
             Service(
                 date=travel_date,
                 company=company,
                 departure=departure or "--:--",
                 arrival=arrival or "--:--",
-                category=category.strip(),
+                category=category,
                 requested=requested,
                 total_quota=total,
                 service_id=service_id,
-                radio_value=value,
+                radio_value=radio_value,
                 info=info,
+                available=available,
+                unavailable_reason=unavailable_reason,
             )
         )
-    return result
 
+    return result
 
 def parse_confirmation_summary(html: str) -> ConfirmationSummary:
     soup = BeautifulSoup(html, "html.parser")
