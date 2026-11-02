@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import re
 import sys
 import threading
 import time
@@ -55,6 +56,33 @@ COLOR_DANGER_BG = wx.Colour(254, 226, 226)    # #FEE2E2
 COLOR_WARNING = wx.Colour(146, 64, 14)        # #92400E
 COLOR_WARNING_BG = wx.Colour(254, 243, 199)   # #FEF3C7
 COLOR_WHITE = wx.Colour(255, 255, 255)
+
+
+def _format_update_notes(notes: str, version: str) -> str:
+    """Reduce las notas de GitHub a cambios breves y legibles para el diálogo."""
+    cleaned = []
+    version_prefix = f"v{version}:".casefold()
+    metadata = re.compile(r"\s+by\s+@\S+\s+in\s+https?://\S+\s*$", re.IGNORECASE)
+
+    for raw in notes.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("**Full Changelog**"):
+            continue
+        if not line.startswith(("* ", "- ")):
+            continue
+        text = metadata.sub("", line[2:].strip()).strip()
+        if not text:
+            continue
+        cleaned.append(text)
+
+    matching = [item for item in cleaned if item.casefold().startswith(version_prefix)]
+    selected = matching or cleaned[:5]
+    result = []
+    for item in selected:
+        if item[-1:] not in ".!?":
+            item += "."
+        result.append(f"* {item}")
+    return "\n".join(result)
 
 
 def _windows_high_contrast_enabled() -> bool:
@@ -345,19 +373,15 @@ class MainFrame(wx.Frame):
         # diálogo cuando exista una versión nueva. La comprobación automática
         # se ejecuta como máximo una vez cada 24 horas para no insistir en cada
         # inicio del programa.
-        notes = info.notes.strip()
-        if len(notes) > 1600:
-            notes = notes[:1600].rstrip() + "…"
+        notes = _format_update_notes(info.notes, info.version)
         message = (
-            f"Está disponible Pasajes Accesibles CNRT {info.version}.\n\n"
+            "Está disponible una nueva versión de Pasajes Accesibles CNRT\n"
             f"Versión instalada: {__version__}.\n\n"
+            "¿Qué hay de nuevo?\n"
         )
         if notes:
-            message += f"Cambios publicados:\n{notes}\n\n"
-        package_label = "paquete portable" if info.channel == "portable" else "instalador"
-        message += (
-            f"¿Querés descargarla ahora? El {package_label} se verificará mediante SHA-256 antes de aplicarse."
-        )
+            message += f"{notes}\n\n"
+        message += "¿Querés actualizar ahora?"
         answer = wx.MessageBox(
             message,
             "Actualización disponible",
@@ -397,23 +421,24 @@ class MainFrame(wx.Frame):
             return
         portable = info.channel == "portable"
         if portable:
-            action_text = (
+            message = (
+                f"Pasajes Accesibles CNRT {info.version} se descargó y está lista para actualizarse.\n\n"
                 "Al continuar, esta ventana se cerrará y un actualizador auxiliar reemplazará "
                 "la carpeta portable por la nueva versión. Después volverá a abrir el programa. "
-                "Tus preferencias y datos guardados en AppData no se eliminan.\n\n"
-                "¿Actualizar ahora?"
+                "Tus datos guardados no se borrarán.\n\n"
+                "¿Te gustaría continuar ahora?"
             )
             title = "Actualización portable lista"
         else:
-            action_text = (
+            message = (
+                f"Pasajes Accesibles CNRT {info.version} se descargó y su SHA-256 fue verificado.\n\n"
                 "Al continuar se abrirá el instalador y esta ventana se cerrará. "
                 "Tus preferencias y datos guardados en AppData no se eliminan.\n\n"
                 "¿Instalar ahora?"
             )
             title = "Actualización lista para instalar"
         answer = wx.MessageBox(
-            f"Pasajes Accesibles CNRT {info.version} se descargó y su SHA-256 fue verificado.\n\n"
-            + action_text,
+            message,
             title,
             wx.YES_NO | wx.NO_DEFAULT | wx.ICON_INFORMATION,
             self,

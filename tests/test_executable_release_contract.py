@@ -58,6 +58,23 @@ class ExecutableReleaseContractTests(unittest.TestCase):
         self.assertIn('prepare_portable_update', app)
         self.assertIn('launch_portable_update', app)
 
+    def test_update_dialogs_use_simple_user_facing_copy(self):
+        app = (ROOT / "pasajes_accesibles_cnrt" / "app.py").read_text(encoding="utf-8")
+        self.assertIn('"Está disponible una nueva versión de Pasajes Accesibles CNRT\\n"', app)
+        self.assertIn('"¿Qué hay de nuevo?\\n"', app)
+        self.assertIn('"¿Querés actualizar ahora?"', app)
+        self.assertNotIn('"Cambios publicados:', app)
+        self.assertIn('"Tus datos guardados no se borrarán.\\n\\n"', app)
+        self.assertIn('"¿Te gustaría continuar ahora?"', app)
+        self.assertIn('se descargó y está lista para actualizarse.', app)
+
+    def test_generated_github_notes_are_simplified_for_the_dialog(self):
+        app = (ROOT / "pasajes_accesibles_cnrt" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("def _format_update_notes(notes: str, version: str) -> str:", app)
+        self.assertIn("version_prefix = f\"v{version}:\".casefold()", app)
+        self.assertIn("metadata.sub", app)
+        self.assertIn("matching or cleaned[:5]", app)
+
     def test_automatic_update_check_prompts_when_a_new_version_exists(self):
         app = (ROOT / "pasajes_accesibles_cnrt" / "app.py").read_text(encoding="utf-8")
         self.assertIn('Tanto la comprobación automática como la manual deben avisar', app)
