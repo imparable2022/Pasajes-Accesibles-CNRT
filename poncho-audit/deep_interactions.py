@@ -25,8 +25,8 @@ def run_search(browser):
     p=browser.new_page()
     p.set_content('''
        <h1>Prueba de búsqueda</h1>
-       <div data-scope="a"><label for="input-a">Buscar A</label><input id="input-a" class="js-poncho-map-search__input"></div>
-       <div data-scope="b"><label for="input-b">Buscar B</label><input id="input-b" class="js-poncho-map-search__input"></div>
+       <div data-scope="a"><label for="input-a">Buscar A</label><div class="input-group"><input id="input-a" class="js-poncho-map-search__input"></div></div>
+       <div data-scope="b"><label for="input-b">Buscar B</label><div class="input-group"><input id="input-b" class="js-poncho-map-search__input"></div></div>
        <button id="after">Después del buscador</button>
     ''')
     p.add_script_tag(path=str(UPSTREAM/"src/js/poncho-map/src/js/poncho-map-search.js"))
