@@ -50,11 +50,15 @@ change("src/js/poncho-map/src/js/poncho-map.js", [(
 
 change("src/js/poncho-map/src/js/poncho-map-search.js", [
 ('searchElement.setAttribute("aria-controls", "js-poncho-results-list");',
- 'searchElement.setAttribute("aria-controls", @@BT@@js-poncho-results-list@@SCOPE@@@@BT@@);'),
+ 'searchElement.removeAttribute("aria-controls");'),
 ('searchContainer.id = "js-poncho-results-list";',
  'searchContainer.id = @@BT@@js-poncho-results-container@@SCOPE@@@@BT@@;'),
 ('ul.setAttribute("role", "listbox");',
- 'ul.setAttribute("role", "listbox");\n                ul.id = @@BT@@js-poncho-results-list@@SCOPE@@@@BT@@;')
+ 'ul.setAttribute("role", "listbox");\n                ul.id = @@BT@@js-poncho-results-list@@SCOPE@@@@BT@@;\n                searchElement.setAttribute("aria-controls", ul.id);'),
+('searchContainer.replaceChildren();\n                searchElement.setAttribute("aria-expanded", "false");',
+ 'searchContainer.replaceChildren();\n                searchElement.setAttribute("aria-expanded", "false");\n                searchElement.removeAttribute("aria-controls");'),
+('searchElement.setAttribute("aria-expanded", "false");\n        }\n    }',
+ 'searchElement.setAttribute("aria-expanded", "false");\n            searchElement.removeAttribute("aria-controls");\n        }\n    }')
 ])
 
 change("src/js/device-breadcrumb/src/scss/device-breadcrumb.scss", [
