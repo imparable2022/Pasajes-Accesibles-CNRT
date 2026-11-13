@@ -50,6 +50,9 @@ jobs:
       - name: Audit ALL upstream demo HTML files in desktop and mobile (before)
         run: python poncho-audit/scan_demos.py before --jobs 6
 
+      - name: Probe real search keyboard interactions and dialog semantics (before)
+        run: python poncho-audit/deep_interactions.py before
+
       - name: Apply accessibility changes in a local working copy
         run: |
           python poncho-a11y/apply_fixes.py
@@ -57,6 +60,9 @@ jobs:
 
       - name: Audit ALL demos in desktop and mobile after changes
         run: python poncho-audit/scan_demos.py after --jobs 6
+
+      - name: Probe real search keyboard interactions and dialog semantics (after)
+        run: python poncho-audit/deep_interactions.py after
 
       - name: Compare before/after findings
         if: always()
