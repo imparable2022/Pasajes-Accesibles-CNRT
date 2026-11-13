@@ -98,24 +98,60 @@ html("combobox", f"""
 <input id="input-a" class="js-poncho-map-search__input"></div>
 <div data-scope="b"><label for="input-b">Buscar B</label>
 <input id="input-b" class="js-poncho-map-search__input"></div>
+<p id="selected" role="status">Sin selección</p>
 <script src="{search_url}"></script>
 <script>
   window.slugify = s => String(s).toLowerCase();
+  window.selected = [];
   for(const scope of ["a", "b"]) {{
      const instance = {{
          headers: {{}}, title: "name", id: "id", search_fields: [],
-         scope_sufix: "--" + scope
+         scope_sufix: "--" + scope,
+         _setSearchInputValue: value => {{ window.selected.push(["value",scope,value]); }},
+         gotoEntry: (id, a, b) => {{ window.selected.push(["goto",scope,id]); document.getElementById("selected").textContent="Seleccionado "+id; }}
      }};
      const search = new PonchoMapSearch(instance, {{
           scope, combobox:true, datalist:false,
           combobox_options: {{}}, debounce_delay: 10
      }});
-     search.cachedDataEntries = [{{id: scope, name: "Santa Fe", results:"santa"}}];
+     search.cachedDataEntries = [
+       {{id:scope+"-1",name:"Santa Fe",results:"san"}},
+       {{id:scope+"-2",name:"San Justo",results:"san"}},
+       {{id:scope+"-3",name:"San Javier",results:"san"}}
+     ];
      search.searcher();
      const el = document.getElementById("input-" + scope);
      el.value = "san";
      el.dispatchEvent(new KeyboardEvent("keyup", {{key:"n", bubbles:true}}));
   }}
+</script>
+""")
+
+
+dialog_methods = {name:map_source[
+    map_source.index("    "+name+" = "):
+    map_source.index("\\n    };", map_source.index("    "+name+" = ")) + len("\\n    };")
+] for name in ["_renderSlider", "toggleSlider", "isSliderOpen"]}
+method_map=json.dumps(dialog_methods)
+html("dialog", f"""
+<h2>Panel de información</h2>
+<button id="trigger" type="button">Mostrar información</button>
+<div class="poncho-map" data-scope="ponchomap"></div>
+<button id="outside" type="button">Acción exterior</button>
+<button id="state" type="button" onclick="this.textContent='Panel: '+document.querySelector('dialog').getAttribute('aria-modal')">Leer estado</button>
+<script>
+ const context = {{
+   render_slider:true,content_outside:false,no_info:false,
+   scope_selector:'[data-scope="ponchomap"]',scope_sufix:"--ponchomap",
+   slider_selector:"pm-slider", _t:s=>s,
+   addAnchorElement:opts=>document.createElement('a')
+ }};
+ for(const [name,code] of Object.entries({method_map})){{
+   const arrow=code.slice(code.indexOf("=")+1).trim().replace(/;$/, "");
+   context[name]=new Function("return ("+arrow+");").call(context);
+ }}
+ context._renderSlider();
+ document.getElementById("trigger").addEventListener("click",()=>context.toggleSlider());
 </script>
 """)
 
