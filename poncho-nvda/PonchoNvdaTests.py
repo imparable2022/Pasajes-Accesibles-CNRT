@@ -74,3 +74,39 @@ def verify_combobox(phase):
     # real NVDA speech, without claiming the whole combobox pattern is fixed.
     assert input_speech.strip(), "No NVDA announcement for combobox input"
     assert option_speech.strip(), "No NVDA announcement after ArrowDown"
+
+
+def verify_combobox_navigation(phase):
+    """Use NVDA's real keyboard gestures for multiple search results."""
+    _page("combobox", phase)
+    input_speech=_chrome.getSpeechAfterTab()
+    first=NvdaLib.getSpeechAfterKey("downArrow")
+    second=NvdaLib.getSpeechAfterKey("downArrow")
+    back=NvdaLib.getSpeechAfterKey("upArrow")
+    input_again=NvdaLib.getSpeechAfterKey("upArrow")
+    first_again=NvdaLib.getSpeechAfterKey("downArrow")
+    escape=NvdaLib.getSpeechAfterKey("escape")
+    details=dict(input=input_speech, first=first, second=second,
+       back=back, input_again=input_again, first_again=first_again,
+       escape=escape)
+    _record("combobox-nav",phase,details)
+    if "Santa Fe" not in first:
+        raise AssertionError(f"NVDA did not read first result: {first!r}")
+    if "San Justo" not in second:
+        raise AssertionError(f"NVDA did not read second result: {second!r}")
+    if "Santa Fe" not in back:
+        raise AssertionError(f"NVDA did not return to first result: {back!r}")
+
+def verify_dialog(phase):
+    """Exercise original PonchoMap dialog using the NVDA system test spy."""
+    _page("dialog",phase)
+    trigger=_chrome.getSpeechAfterTab()
+    opened=NvdaLib.getSpeechAfterKey("enter")
+    first=NvdaLib.getSpeechAfterKey("tab")
+    escape=NvdaLib.getSpeechAfterKey("escape")
+    report_focus=NvdaLib.getSpeechAfterKey("NVDA+tab")
+    details=dict(trigger=trigger, open=opened, first=first,
+       escape=escape, focus_after_escape=report_focus)
+    _record("dialog",phase,details)
+    assert "Mostrar información" in trigger, trigger
+    assert first.strip(), "NVDA did not announce first interactive dialog element"
