@@ -1,0 +1,129 @@
+name: Poncho - NVDA screen-reader audit of all 64 official demos
+
+on:
+  push:
+    branches:
+      - "audit/poncho-accessibility-2026-11"
+    paths:
+      - "poncho-nvda/PonchoFullDemos.py"
+      - "poncho-nvda/ponchoFullDemos.robot"
+      - ".github/workflows/poncho-nvda-all-demos.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  all-64-nvda:
+    runs-on: windows-2025
+    timeout-minutes: 58
+    steps:
+      - name: Checkout audit scripts
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout original Poncho source
+        uses: actions/checkout@v4
+        with:
+          repository: argob/poncho
+          ref: de6a86e643ff264b5206cb334787d519daf995d9
+          path: upstream
+          persist-credentials: false
+
+      - name: Checkout NVDA Robot system-test framework
+        uses: actions/checkout@v4
+        with:
+          repository: nvaccess/nvda
+          ref: release-2026.3.1
+          path: nvda
+          persist-credentials: false
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install official NVDA Robot test dependencies
+        shell: pwsh
+        run: python -m pip install robotframework==7.5 robotremoteserver==1.1.1 robotframework-screencaplibrary==1.6.0
+
+      - name: Get NVDA 2026.3.1 and confirm publisher checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force nvda-installer | Out-Null
+          $file = Join-Path (Resolve-Path nvda-installer).Path 'nvda_2026.3.1.exe'
+          Invoke-WebRequest -Uri 'https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe' -OutFile $file
+          $expected = '6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052'
+          $actual = (Get-FileHash -Path $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "NVDA installer SHA-256 mismatch" }
+
+      - name: Install real NVDA using the official project's CI script
+        shell: pwsh
+        run: |
+          $env:nvdaLauncherDir = (Resolve-Path nvda-installer).Path
+          New-Item -ItemType Directory -Force nvda/testOutput/install | Out-Null
+          Push-Location nvda
+          try {
+            ./ci/scripts/installNVDA.ps1
+            if ($LASTEXITCODE -ne 0) { throw "NVDA installation failed" }
+          } finally { Pop-Location }
+
+      - name: Copy all-demo tests into official NVDA Robot suite
+        shell: pwsh
+        run: |
+          Copy-Item poncho-nvda/PonchoFullDemos.py nvda/tests/system/robot/PonchoFullDemos.py
+          Copy-Item poncho-nvda/ponchoFullDemos.robot nvda/tests/system/robot/ponchoFullDemos.robot
+
+      - name: Baseline - visit all 64 original demos with NVDA and Tab
+        shell: pwsh
+        continue-on-error: true
+        env:
+          PONCHO_PHASE: before
+        run: |
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include poncho-full --output output-before.xml --xunit xunit-before.xml --log log-before.html --report report-before.html tests/system/robot/ponchoFullDemos.robot
+            Write-Host "Robot before exit code: $LASTEXITCODE"
+          } finally { Pop-Location }
+
+      - name: Apply proposed Poncho accessibility changes
+        shell: pwsh
+        run: |
+          python poncho-a11y/apply_fixes.py
+          git -C upstream diff > poncho-nvda/poncho-fixes.patch
+
+      - name: Corrected - revisit all 64 demos with NVDA and Tab
+        shell: pwsh
+        continue-on-error: true
+        env:
+          PONCHO_PHASE: after
+        run: |
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include poncho-full --output output-after.xml --xunit xunit-after.xml --log log-after.html --report report-after.html tests/system/robot/ponchoFullDemos.robot
+            Write-Host "Robot after exit code: $LASTEXITCODE"
+          } finally { Pop-Location }
+
+      - name: Compare NVDA traversal status for every demo
+        shell: pwsh
+        run: |
+          $a = Get-Content poncho-nvda/speech-results/all-official-demos-before.json -Raw | ConvertFrom-Json
+          $b = Get-Content poncho-nvda/speech-results/all-official-demos-after.json -Raw | ConvertFrom-Json
+          Write-Host "Original: $($a.visited)/$($a.demoCount) demos; errors $($a.errors), no speech $($a.noSpeech)"
+          Write-Host "Patched:  $($b.visited)/$($b.demoCount) demos; errors $($b.errors), no speech $($b.noSpeech)"
+          if ($a.demoCount -lt 60 -or $b.demoCount -lt 60) { throw "Incomplete demo inventory" }
+          $comparison = [PSCustomObject]@{original=$a.visited;patched=$b.visited;total=$a.demoCount;errorsOriginal=$a.errors;errorsPatched=$b.errors}
+          $comparison | ConvertTo-Json | Set-Content poncho-nvda/speech-results/summary.json
+
+      - name: Preserve NVDA speech, complete Robot results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poncho-all-64-demos-nvda
+          path: |
+            poncho-nvda/speech-results/
+            poncho-nvda/poncho-fixes.patch
+            nvda/testOutput/system/
+            nvda/testOutput/install/
+          if-no-files-found: warn
