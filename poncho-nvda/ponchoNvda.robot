@@ -31,3 +31,12 @@ Combobox baseline - NVDA announcement
     Verify Combobox    before
 Combobox corrected - NVDA announcement
     Verify Combobox    after
+
+Combobox baseline - three results, arrows and Escape with NVDA
+    Verify Combobox Navigation    before
+Combobox corrected - three results, arrows and Escape with NVDA
+    Verify Combobox Navigation    after
+Dialog baseline - NVDA focus and Escape
+    Verify Dialog    before
+Dialog corrected - NVDA focus and Escape
+    Verify Dialog    after
