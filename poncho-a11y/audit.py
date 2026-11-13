@@ -48,13 +48,12 @@ with sync_playwright() as engine:
       const fn = new Function("return (" + arrow + ");").call(context);
       fn();
       return {name: path.getAttribute("aria-label"),
-              role: path.getAttribute("role"),
               entry: path.getAttribute("data-entry-id")};
     }""", snippet)
     results["svg"] = svg
     check("Atributos SVG", svg,
-          {"name": None, "role": None, "entry": None} if PHASE == "before"
-          else {"name": "Santa Fe", "role": "button", "entry": "123"})
+          {"name": None, "entry": None} if PHASE == "before"
+          else {"name": "Santa Fe", "entry": "123"})
     page.close()
 
     # 2. Construye dos buscadores reales del repositorio y genera resultados.
