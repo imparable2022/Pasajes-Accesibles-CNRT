@@ -3,8 +3,8 @@ Documentation    Broad NVDA + Chrome smoke navigation of all Poncho HTML demo pa
 Library    NvdaLib.py
 Library    ChromeLib.py
 Library    PonchoFullDemos.py
-Suite Setup    Start NVDA    standard-dontShowWelcomeDialog.ini
-Suite Teardown    Quit NVDA
+Test Setup    Start NVDA    standard-dontShowWelcomeDialog.ini
+Test Teardown    Quit NVDA
 Force Tags    poncho-full    nvda    chrome
 
 *** Test Cases ***
