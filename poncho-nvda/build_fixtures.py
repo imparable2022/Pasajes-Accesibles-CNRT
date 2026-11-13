@@ -130,7 +130,7 @@ html("combobox", f"""
 
 dialog_methods = {name:map_source[
     map_source.index("    "+name+" = "):
-    map_source.index("\\n    };", map_source.index("    "+name+" = ")) + len("\\n    };")
+    map_source.index("\n    };", map_source.index("    "+name+" = ")) + len("\n    };")
 ] for name in ["_renderSlider", "toggleSlider", "isSliderOpen"]}
 method_map=json.dumps(dialog_methods)
 html("dialog", f"""
