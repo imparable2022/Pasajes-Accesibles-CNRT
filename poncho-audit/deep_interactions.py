@@ -50,7 +50,7 @@ def run_search(browser):
         search.searcher();
       }
     }""")
-    p.locator("#input-a").fill("san")
+    p.locator("#input-a").fill("sa")
     p.locator("#input-a").press("n")
     p.wait_for_timeout(80)
     before=p.evaluate("""() => ({
@@ -86,7 +86,7 @@ def run_search(browser):
        focusedInput:document.activeElement.id==="input-a"
     })""")
     # Reload results; Enter on native result link should work as a real click.
-    p.locator("#input-a").fill("san")
+    p.locator("#input-a").fill("sa")
     p.locator("#input-a").press("n")
     p.wait_for_timeout(80)
     p.locator("#input-a").press("ArrowDown")
