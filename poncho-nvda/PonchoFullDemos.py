@@ -7,6 +7,7 @@ any demo that fails to load, plus exact NVDA speech during initial Tab visits.
 """
 from pathlib import Path
 import json
+import os
 import re
 import traceback
 
@@ -20,6 +21,7 @@ _builtIn=BuiltIn()
 ROOT=Path.cwd().parent
 OUTPUT=ROOT/"poncho-nvda"/"speech-results"
 OUTPUT.mkdir(parents=True,exist_ok=True)
+PHASE=os.environ.get("PONCHO_PHASE", "before")
 
 def check_all_demo_pages_with_nvda():
     demos=sorted(p for p in (ROOT/"upstream").rglob("*.html")
@@ -55,7 +57,7 @@ def check_all_demo_pages_with_nvda():
                 record["closeError"]=str(error)[:200]
         report.append(record)
         # Save incrementally so test output survives runner cancellation.
-        (OUTPUT/"all-official-demos.json").write_text(
+        (OUTPUT/f"all-official-demos-{PHASE}.json").write_text(
             json.dumps(dict(demoCount=len(demos),visited=sum(x["status"]=="visited" for x in report),
                  noSpeech=sum(x["status"]=="no-speech" for x in report),
                  errors=sum(x["status"]=="error" for x in report),pages=report),
@@ -65,4 +67,4 @@ def check_all_demo_pages_with_nvda():
     _builtIn.log(f"Full demo audit: {len(demos)} pages; {len(failures)} failures",level="INFO")
     if failures:
         raise AssertionError(f"{len(failures)} demos without successful NVDA Tab smoke test. "
-           f"See all-official-demos.json, e.g. {failures[:3]}")
+           f"See all-official-demos-{PHASE}.json, e.g. {failures[:3]}")
