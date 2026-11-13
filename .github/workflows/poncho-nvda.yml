@@ -37,6 +37,7 @@ jobs:
           repository: nvaccess/nvda
           ref: release-2026.3.1
           path: nvda
+          submodules: recursive
           persist-credentials: false
 
       - name: Python 3.13 used by NVDA
