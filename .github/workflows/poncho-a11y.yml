@@ -52,6 +52,11 @@ jobs:
       - name: Apply proposed accessibility fixes to working copy
         run: python poncho-a11y/apply_fixes.py | tee poncho-a11y-patching.log
 
+      - name: Run official Poncho project regression tests
+        run: |
+          npm ci --prefix upstream
+          npm test --prefix upstream -- --runInBand
+
       - name: Verify behavior after fixes in Chromium
         run: python poncho-a11y/audit.py after | tee poncho-a11y-after.log
 
