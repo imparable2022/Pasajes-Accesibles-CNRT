@@ -16,7 +16,14 @@ permissions:
 jobs:
   all-64-nvda:
     runs-on: windows-2025
-    timeout-minutes: 58
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      PONCHO_SHARD: ${{ matrix.shard }}
+      PONCHO_SHARDS: "4"
     steps:
       - name: Checkout audit scripts
         uses: actions/checkout@v4
@@ -108,11 +115,11 @@ jobs:
       - name: Compare NVDA traversal status for every demo
         shell: pwsh
         run: |
-          $a = Get-Content poncho-nvda/speech-results/all-official-demos-before.json -Raw | ConvertFrom-Json
-          $b = Get-Content poncho-nvda/speech-results/all-official-demos-after.json -Raw | ConvertFrom-Json
+          $a = Get-Content "poncho-nvda/speech-results/all-official-demos-before-shard$env:PONCHO_SHARD.json" -Raw | ConvertFrom-Json
+          $b = Get-Content "poncho-nvda/speech-results/all-official-demos-after-shard$env:PONCHO_SHARD.json" -Raw | ConvertFrom-Json
           Write-Host "Original: $($a.visited)/$($a.demoCount) demos; errors $($a.errors), no speech $($a.noSpeech)"
           Write-Host "Patched:  $($b.visited)/$($b.demoCount) demos; errors $($b.errors), no speech $($b.noSpeech)"
-          if ($a.demoCount -lt 60 -or $b.demoCount -lt 60) { throw "Incomplete demo inventory" }
+          if ($a.totalInventory -lt 60 -or $b.totalInventory -lt 60 -or $a.demoCount -lt 1) { throw "Incomplete demo inventory" }
           Write-Host ("First original errors: " + (($a.pages | Where-Object status -ne 'visited' | Select-Object -First 3 | ForEach-Object { $_.path + ': ' + $_.error }) -join ' | '))
           Write-Host ("First patched errors: " + (($b.pages | Where-Object status -ne 'visited' | Select-Object -First 3 | ForEach-Object { $_.path + ': ' + $_.error }) -join ' | '))
           if ($a.visited -lt $a.demoCount -or $b.visited -lt $b.demoCount) {
@@ -125,7 +132,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: poncho-all-64-demos-nvda
+          name: poncho-all-64-demos-nvda-shard-${{ matrix.shard }}
           path: |
             poncho-nvda/speech-results/
             poncho-nvda/poncho-fixes.patch
