@@ -22,12 +22,17 @@ ROOT=Path.cwd().parent
 OUTPUT=ROOT/"poncho-nvda"/"speech-results"
 OUTPUT.mkdir(parents=True,exist_ok=True)
 PHASE=os.environ.get("PONCHO_PHASE", "before")
+SHARD=int(os.environ.get("PONCHO_SHARD", "0"))
+SHARDS=int(os.environ.get("PONCHO_SHARDS", "1"))
 
 def check_all_demo_pages_with_nvda():
     demos=sorted(p for p in (ROOT/"upstream").rglob("*.html")
                  if "/demo/" in p.relative_to(ROOT/"upstream").as_posix())
     if len(demos)<60:
         raise AssertionError(f"Missing demos: {len(demos)}")
+    full_count=len(demos)
+    demos=[p for i,p in enumerate(demos) if i%SHARDS==SHARD]
+    print(f"NVDA shard {SHARD}/{SHARDS}: {len(demos)} of {full_count} demos",flush=True)
 
     report=[]
     for n,demo in enumerate(demos,1):
@@ -57,8 +62,8 @@ def check_all_demo_pages_with_nvda():
                 record["closeError"]=str(error)[:200]
         report.append(record)
         # Save incrementally so test output survives runner cancellation.
-        (OUTPUT/f"all-official-demos-{PHASE}.json").write_text(
-            json.dumps(dict(demoCount=len(demos),visited=sum(x["status"]=="visited" for x in report),
+        (OUTPUT/f"all-official-demos-{PHASE}-shard{SHARD}.json").write_text(
+            json.dumps(dict(demoCount=len(demos),totalInventory=full_count,shard=SHARD,shards=SHARDS,visited=sum(x["status"]=="visited" for x in report),
                  noSpeech=sum(x["status"]=="no-speech" for x in report),
                  errors=sum(x["status"]=="error" for x in report),pages=report),
                  indent=2,ensure_ascii=False),encoding="utf-8"
@@ -67,4 +72,4 @@ def check_all_demo_pages_with_nvda():
     _builtIn.log(f"Full demo audit: {len(demos)} pages; {len(failures)} failures",level="INFO")
     if failures:
         raise AssertionError(f"{len(failures)} demos without successful NVDA Tab smoke test. "
-           f"See all-official-demos-{PHASE}.json, e.g. {failures[:3]}")
+           f"See all-official-demos-{PHASE}-shard{SHARD}.json, e.g. {failures[:3]}")
