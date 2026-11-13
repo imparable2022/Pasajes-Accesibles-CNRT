@@ -40,7 +40,7 @@ html("svg", f"""
 <script src="{map_url}"></script>
 <h2>Mapa de provincias</h2>
 <svg width="160" height="100" aria-label="Mapa" role="group">
-  <path d="M10 10 H130 V80 H10 Z" fill="#1967a3" id="santa-fe-shape" />
+  <path d="M10 10 H130 V80 H10 Z" fill="#1967a3" id="santa-fe-shape" tabindex="0" role="button" />
 </svg>
 <script>
   const path = document.getElementById("santa-fe-shape");
