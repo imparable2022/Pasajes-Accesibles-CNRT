@@ -113,6 +113,11 @@ jobs:
           Write-Host "Original: $($a.visited)/$($a.demoCount) demos; errors $($a.errors), no speech $($a.noSpeech)"
           Write-Host "Patched:  $($b.visited)/$($b.demoCount) demos; errors $($b.errors), no speech $($b.noSpeech)"
           if ($a.demoCount -lt 60 -or $b.demoCount -lt 60) { throw "Incomplete demo inventory" }
+          Write-Host ("First original errors: " + (($a.pages | Where-Object status -ne 'visited' | Select-Object -First 3 | ForEach-Object { $_.path + ': ' + $_.error }) -join ' | '))
+          Write-Host ("First patched errors: " + (($b.pages | Where-Object status -ne 'visited' | Select-Object -First 3 | ForEach-Object { $_.path + ': ' + $_.error }) -join ' | '))
+          if ($a.visited -lt $a.demoCount -or $b.visited -lt $b.demoCount) {
+            throw "NVDA did not validate every demo: original $($a.visited)/$($a.demoCount); patched $($b.visited)/$($b.demoCount)"
+          }
           $comparison = [PSCustomObject]@{original=$a.visited;patched=$b.visited;total=$a.demoCount;errorsOriginal=$a.errors;errorsPatched=$b.errors}
           $comparison | ConvertTo-Json | Set-Content poncho-nvda/speech-results/summary.json
 
