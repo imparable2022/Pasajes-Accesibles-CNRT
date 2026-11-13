@@ -85,25 +85,30 @@ def verify_combobox(phase):
 
 
 def verify_combobox_navigation(phase):
-    """Use NVDA's real keyboard gestures for multiple search results."""
+    """Check what NVDA reports as real keyboard focus, not only emitted speech."""
     _page("combobox", phase)
     input_speech=_chrome.getSpeechAfterTab()
-    first=NvdaLib.getSpeechAfterKey("downArrow")
-    second=NvdaLib.getSpeechAfterKey("downArrow")
-    back=NvdaLib.getSpeechAfterKey("upArrow")
-    input_again=NvdaLib.getSpeechAfterKey("upArrow")
-    first_again=NvdaLib.getSpeechAfterKey("downArrow")
-    escape=NvdaLib.getSpeechAfterKey("escape")
-    details=dict(input=input_speech, first=first, second=second,
-       back=back, input_again=input_again, first_again=first_again,
-       escape=escape)
-    _record("combobox-nav",phase,details)
-    if "Santa Fe" not in first:
-        raise AssertionError(f"NVDA did not read first result: {first!r}")
-    if "San Justo" not in second:
-        raise AssertionError(f"NVDA did not read second result: {second!r}")
-    if "Santa Fe" not in back:
-        raise AssertionError(f"NVDA did not return to first result: {back!r}")
+    first_speech=NvdaLib.getSpeechAfterKey("downArrow")
+    first_focus=NvdaLib.getSpeechAfterKey("NVDA+tab")
+    second_speech=NvdaLib.getSpeechAfterKey("downArrow")
+    second_focus=NvdaLib.getSpeechAfterKey("NVDA+tab")
+    back_speech=NvdaLib.getSpeechAfterKey("upArrow")
+    back_focus=NvdaLib.getSpeechAfterKey("NVDA+tab")
+    escape=_speech_without_requiring_new_utterance("escape")
+    escape_focus=NvdaLib.getSpeechAfterKey("NVDA+tab")
+    details=dict(input=input_speech, first_speech=first_speech,
+       first_focus=first_focus, second_speech=second_speech,
+       second_focus=second_focus, back_speech=back_speech,
+       back_focus=back_focus, escape=escape, escape_focus=escape_focus)
+    _record("combobox-nav", phase, details)
+    # These are behavioral assertions. If they fail, preserve the evidence:
+    # a JS keydown success in Chromium alone is not NVDA keyboard access.
+    assert "Santa Fe" in first_focus, (
+        f"First ArrowDown did not focus Santa Fe: {first_focus!r}")
+    assert "San Justo" in second_focus, (
+        f"Second ArrowDown did not focus San Justo: {second_focus!r}")
+    assert "Santa Fe" in back_focus, (
+        f"ArrowUp did not return to Santa Fe: {back_focus!r}")
 
 def _speech_without_requiring_new_utterance(key):
     """NVDA may correctly remain silent after Escape. Collect raw spy output."""
