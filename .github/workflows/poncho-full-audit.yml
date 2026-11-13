@@ -1,0 +1,83 @@
+name: Poncho full demo accessibility audit - 64 demos, 2 viewports
+
+on:
+  push:
+    branches:
+      - "audit/poncho-accessibility-2026-11"
+    paths:
+      - "poncho-audit/**"
+      - "poncho-a11y/apply_fixes.py"
+      - ".github/workflows/poncho-full-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-demo-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout experimental audit project
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact upstream Poncho revision
+        uses: actions/checkout@v4
+        with:
+          repository: argob/poncho
+          ref: de6a86e643ff264b5206cb334787d519daf995d9
+          path: upstream
+          persist-credentials: false
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install browser, WCAG engine and Sass
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
+          npm install --no-save --no-package-lock axe-core@4.11.0 sass@1
+
+      - name: Audit ALL upstream demo HTML files in desktop and mobile (before)
+        run: python poncho-audit/scan_demos.py before --jobs 6
+
+      - name: Apply accessibility changes in a local working copy
+        run: |
+          python poncho-a11y/apply_fixes.py
+          git -C upstream diff --no-ext-diff > poncho-audit/poncho-proposed-changes.patch
+
+      - name: Audit ALL demos in desktop and mobile after changes
+        run: python poncho-audit/scan_demos.py after --jobs 6
+
+      - name: Compare before/after findings
+        if: always()
+        run: |
+          if [ -f poncho-audit/results/all-demos-after.json ]; then
+            python poncho-audit/compare_results.py
+          else
+            echo "Second phase did not complete; check JSON logs."
+          fi
+
+      - name: Run official Poncho regression tests
+        run: |
+          npm ci --prefix upstream
+          npm test --prefix upstream -- --runInBand
+
+      - name: Publish audit files even if any phase fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poncho-full-64-demo-audit
+          path: |
+            poncho-audit/results/
+            poncho-audit/poncho-proposed-changes.patch
+          if-no-files-found: warn
