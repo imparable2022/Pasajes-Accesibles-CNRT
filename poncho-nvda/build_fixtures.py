@@ -73,7 +73,7 @@ html("panel", f"""
 <h2>Menú de navegación</h2>
 <details class="device-panel-menu"><summary>Opciones de navegación</summary>
   <p><a href="#contenido">Contenido del menú</a></p></details>
-<button id="resize" type="button" onclick="window.dispatchEvent(new Event('resize'))">
+<button id="resize" type="button" onclick="window.dispatchEvent(new Event('resize')); this.textContent = 'Estado del menú: ' + (document.querySelector('details').open ? 'abierto' : 'cerrado');">
   Simular redimensión
 </button>
 <script src="{panel_url}"></script>
