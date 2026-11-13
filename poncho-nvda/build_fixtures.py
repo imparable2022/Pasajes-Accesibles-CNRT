@@ -1,5 +1,6 @@
 """Produce Windows/NVDA Chromium fixtures from unmodified and patched Poncho sources."""
 import re
+import json
 import shutil
 import subprocess
 import sys
@@ -36,8 +37,18 @@ css = css_path.read_text("utf-8").replace("@media (max-width: 991px)", "@media (
 css_path.write_text(css, encoding="utf-8")
 css_url = css_path.as_uri()
 
+# PonchoMap._setFetureAttributes is a class instance FIELD (arrow function),
+# not on the prototype. Extract and execute its EXACT current upstream body.
+# The previous prototype call threw before any SVG naming could take place.
+map_source = (SOURCE / "src/js/poncho-map/src/js/poncho-map.js").read_text("utf-8")
+method_name = "    _setFetureAttributes = () => {"
+method_start = map_source.index(method_name)
+method_end = map_source.index("\n    };", method_start) + len("\n    };")
+method = map_source[method_start:method_end]
+arrow_source = method[method.index("=") + 1:].strip().rstrip(";")
+method_json = json.dumps(arrow_source)
+
 html("svg", f"""
-<script src="{map_url}"></script>
 <h2>Mapa de provincias</h2>
 <svg width="160" height="100" aria-label="Mapa" role="group">
   <path d="M10 10 H130 V80 H10 Z" fill="#1967a3" id="santa-fe-shape" tabindex="0" role="button" />
@@ -45,11 +56,13 @@ html("svg", f"""
 <script>
   const path = document.getElementById("santa-fe-shape");
   const properties = {{name: "Santa Fe", id: 123, "pm-interactive": "s"}};
-  PonchoMap.prototype._setFetureAttributes.call({{
+  const fixtureContext = {{
     map: {{eachLayer: cb => cb({{
        _path: path, _leaflet_id: 456, feature: {{properties}}
     }})}}, title: "name", id: "id"
-  }});
+  }};
+  const method = new Function("return (" + {method_json} + ");").call(fixtureContext);
+  method();
 </script>
 """)
 
