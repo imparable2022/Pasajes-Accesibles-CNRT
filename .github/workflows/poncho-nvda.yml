@@ -1,0 +1,117 @@
+name: Poncho accessibility - real NVDA Windows smoke tests
+
+on:
+  push:
+    branches:
+      - "audit/poncho-accessibility-2026-11"
+    paths:
+      - "poncho-nvda/**"
+      - "poncho-a11y/apply_fixes.py"
+      - ".github/workflows/poncho-nvda.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nvda-windows:
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - name: Checkout isolated audit tools
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout official Poncho source
+        uses: actions/checkout@v4
+        with:
+          repository: argob/poncho
+          ref: master
+          path: upstream
+          persist-credentials: false
+
+      - name: Checkout NVDA's own system-test harness
+        uses: actions/checkout@v4
+        with:
+          repository: nvaccess/nvda
+          ref: release-2026.3.1
+          path: nvda
+          persist-credentials: false
+
+      - name: Python 3.13 used by NVDA
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Node for the original Poncho Sass stylesheet
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: NVDA's official UV environment
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Install Sass and create original HTML fixtures
+        shell: pwsh
+        run: |
+          npm install --no-save --no-package-lock sass@1
+          python poncho-nvda/build_fixtures.py before
+
+      - name: Apply experimental Poncho fixes and create corrected fixtures
+        shell: pwsh
+        run: |
+          python poncho-a11y/apply_fixes.py
+          python poncho-nvda/build_fixtures.py after
+          git -C upstream diff > poncho-nvda/poncho-fixes.patch
+
+      - name: Download NVDA 2026.3.1 from NV Access and verify SHA-256
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force nvda-installer | Out-Null
+          $file = Join-Path (Resolve-Path nvda-installer).Path 'nvda_2026.3.1.exe'
+          Invoke-WebRequest -Uri 'https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe' -OutFile $file
+          $expected = '6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052'
+          $actual = (Get-FileHash -Path $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "NVDA installer SHA256 mismatch" }
+          Write-Host "NVDA installer SHA-256 verified"
+
+      - name: Install NVDA like upstream official CI
+        shell: pwsh
+        run: |
+          $env:nvdaLauncherDir = (Resolve-Path nvda-installer).Path
+          New-Item -ItemType Directory -Force nvda/testOutput/install | Out-Null
+          Push-Location nvda
+          try {
+            ./ci/scripts/installNVDA.ps1
+            if ($LASTEXITCODE -ne 0) { throw "NVDA installer failed: $LASTEXITCODE" }
+          } finally { Pop-Location }
+          $nvdaExe = Join-Path $env:ProgramFiles 'nvda/nvda.exe'
+          if (!(Test-Path $nvdaExe)) { throw "Installed nvda.exe is missing" }
+
+      - name: Add Poncho tests to NVDA Robot Framework suite
+        shell: pwsh
+        run: |
+          Copy-Item poncho-nvda/PonchoNvdaTests.py nvda/tests/system/robot/PonchoNvdaTests.py
+          Copy-Item poncho-nvda/ponchoNvda.robot nvda/tests/system/robot/ponchoNvda.robot
+
+      - name: Run browser tests with installed NVDA and record speech
+        shell: pwsh
+        run: |
+          Push-Location nvda
+          try {
+            uv run --group system-tests -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include poncho tests/system/robot/ponchoNvda.robot
+            if ($LASTEXITCODE -ne 0) { throw "NVDA Robot suite failed ($LASTEXITCODE)" }
+          } finally { Pop-Location }
+
+      - name: Upload NVDA speech, Robot reports, logs and proposed changes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poncho-real-nvda-evidence
+          path: |
+            poncho-nvda/speech-results/
+            poncho-nvda/poncho-fixes.patch
+            nvda/testOutput/system/
+            nvda/testOutput/install/
+          if-no-files-found: warn
