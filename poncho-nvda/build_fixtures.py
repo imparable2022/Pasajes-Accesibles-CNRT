@@ -95,9 +95,9 @@ html("panel", f"""
 html("combobox", f"""
 <h2>Búsqueda de lugares</h2>
 <div data-scope="a"><label for="input-a">Buscar A</label>
-<input id="input-a" class="js-poncho-map-search__input"></div>
+<div class="input-group"><input id="input-a" class="js-poncho-map-search__input"></div></div>
 <div data-scope="b"><label for="input-b">Buscar B</label>
-<input id="input-b" class="js-poncho-map-search__input"></div>
+<div class="input-group"><input id="input-b" class="js-poncho-map-search__input"></div></div>
 <p id="selected" role="status">Sin selección</p>
 <script src="{search_url}"></script>
 <script>
