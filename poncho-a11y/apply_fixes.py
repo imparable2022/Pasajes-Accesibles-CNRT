@@ -58,7 +58,9 @@ change("src/js/poncho-map/src/js/poncho-map-search.js", [
 ('searchContainer.replaceChildren();\n                searchElement.setAttribute("aria-expanded", "false");',
  'searchContainer.replaceChildren();\n                searchElement.setAttribute("aria-expanded", "false");\n                searchElement.removeAttribute("aria-controls");'),
 ('searchElement.setAttribute("aria-expanded", "false");\n        }\n    }',
- 'searchElement.setAttribute("aria-expanded", "false");\n            searchElement.removeAttribute("aria-controls");\n        }\n    }')
+ 'searchElement.setAttribute("aria-expanded", "false");\n            searchElement.removeAttribute("aria-controls");\n        }\n    }'),
+('searchElement.addEventListener("keydown", (e) => {\n            if(e.key == "ArrowDown"){',
+ 'searchElement.addEventListener("keydown", (e) => {\n            if (e.key === "Escape" && searchElement.getAttribute("aria-expanded") === "true") {\n                e.preventDefault();\n                this._closeSearchResults();\n                return;\n            }\n            if(e.key == "ArrowDown"){')
 ])
 
 change("src/js/device-breadcrumb/src/scss/device-breadcrumb.scss", [
