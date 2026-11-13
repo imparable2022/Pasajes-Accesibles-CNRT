@@ -1,0 +1,71 @@
+name: Poncho accessibility - reproduce and fix (isolated experiment)
+
+on:
+  push:
+    branches:
+      - "audit/poncho-accessibility-2026-11"
+    paths:
+      - "poncho-a11y/**"
+      - ".github/workflows/poncho-a11y.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated test branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout official Poncho source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: argob/poncho
+          ref: master
+          path: upstream
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node for Sass
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install browser and Sass
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
+          npm install --no-save sass@1
+
+      - name: Reproduce current issues on pristine upstream code
+        run: python poncho-a11y/audit.py before | tee poncho-a11y-before.log
+
+      - name: Apply proposed accessibility fixes to working copy
+        run: python poncho-a11y/apply_fixes.py | tee poncho-a11y-patching.log
+
+      - name: Verify behavior after fixes in Chromium
+        run: python poncho-a11y/audit.py after | tee poncho-a11y-after.log
+
+      - name: Export patch for an upstream pull request
+        if: always()
+        run: git -C upstream diff --no-ext-diff > poncho-a11y-fix.patch
+
+      - name: Upload audit results and proposed patch
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poncho-a11y-audit
+          path: |
+            poncho-a11y-*.json
+            poncho-a11y-*.log
+            poncho-a11y-fix.patch
+          if-no-files-found: warn
