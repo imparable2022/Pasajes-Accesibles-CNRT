@@ -123,7 +123,7 @@ def start_anki():
 def create_deck_via_keyboard():
     activate_anki()
     press("deck screen", "d", 1.2)
-    select_button(["Create Deck","Create deck","Crear mazo","Crear baraja"])
+    select_button(["Create Deck","Create deck","Crear mazo","Crear baraja"], limit=18)
     press("open create deck", "enter", 0.9)
     focus_title(); focus_description()
     # Qt input dialog ordinarily selects the default name.
