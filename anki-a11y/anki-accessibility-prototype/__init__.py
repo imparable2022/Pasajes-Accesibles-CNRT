@@ -51,24 +51,41 @@ REVIEW_JS = r"""
     // into an incomplete label. It remains reachable via Anki's normal DOM.
     if (qa.querySelector("img, svg, math, canvas, iframe, object, video, audio")) return;
 
-    // For answers, use the text *after* <hr id="answer">, so NVDA does
-    // not read the question again. A missing marker means the card has an
-    // unusual template; do not guess the answer boundary.
+    // Derive answer speech from the displayed text, excluding text already
+    // spoken in the question. Standard Basic has <hr id="answer">, but not
+    // every template follows that convention. If no unambiguous answer can
+    // be found, do not invent one.
     let text = "";
+    const normal = value => (value || "").replace(/\s+/g, " ").trim();
     if (side === "answer") {
+        const visible = normal(qa.innerText);
+        const previouslyRead = normal(window.__ankiA11yPreviousQuestion);
+        // Note: aria name for the question must not leak into answer speech.
         const marker = qa.querySelector("#answer");
-        if (!marker) return;
-        const doc = qa.ownerDocument;
-        const range = doc.createRange();
-        range.setStartAfter(marker);
-        range.setEnd(qa, qa.childNodes.length);
-        const holder = doc.createElement("div");
-        holder.appendChild(range.cloneContents());
-        text = holder.textContent || "";
+        if (marker) {
+            try {
+                const range = qa.ownerDocument.createRange();
+                range.setStartAfter(marker);
+                range.setEnd(qa, qa.childNodes.length);
+                text = normal(range.cloneContents().textContent);
+            } catch (_) {
+                text = "";
+            }
+        }
+        if (!text && previouslyRead && visible.startsWith(previouslyRead)) {
+            text = normal(visible.slice(previouslyRead.length));
+        }
+        if (!text && !previouslyRead) {
+            // For non-standard templates, silence is better than speaking
+            // the entire question twice or misrepresenting the answer.
+            return;
+        }
     } else {
-        text = qa.innerText || "";
+        text = normal(qa.innerText);
+        window.__ankiA11yPreviousQuestion = text;
     }
-    text = text.replace(/\s+/g, " ").trim();
+    qa.dataset.ankiA11yLastSide = side;
+    qa.dataset.ankiA11yLastDerived = text.slice(0, 120);
     if (!text || text.length > __LIMIT__) return;
 
     // Preserve the actual card DOM for object navigation and review actions.
