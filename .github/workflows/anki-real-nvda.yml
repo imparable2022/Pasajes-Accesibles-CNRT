@@ -12,6 +12,11 @@ permissions:
 
 jobs:
   anki-nvda:
+    name: NVDA review rich-focus=${{ matrix.rich_focus }}
+    strategy:
+      fail-fast: false
+      matrix:
+        rich_focus: [false, true]
     runs-on: windows-2025
     timeout-minutes: 55
     steps:
@@ -80,6 +85,7 @@ jobs:
           ANKI_A11Y_ADDON_SOURCE: ${{ github.workspace }}\anki-a11y\anki-accessibility-prototype
           ANKI_A11Y_FIXTURE_SOURCE: ${{ github.workspace }}\anki-a11y\anki-fixture-loader
           ANKI_A11Y_CI: '1'
+          ANKI_A11Y_RICH_FOCUS: ${{ matrix.rich_focus }}
         run: |
           New-Item -ItemType Directory -Force out/a11y | Out-Null
           Push-Location nvda
@@ -110,7 +116,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: anki-real-nvda-evidence
+          name: anki-real-nvda-evidence-rich-${{ matrix.rich_focus }}
           path: |
             out/a11y/speech.json
             out/a11y/anki-startup.log
