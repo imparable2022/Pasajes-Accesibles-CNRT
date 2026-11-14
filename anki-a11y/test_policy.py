@@ -31,8 +31,18 @@ def load_addon(options=None):
     fake_aqt.mw = mw
     fake_reviewer = types.ModuleType("aqt.reviewer")
     fake_reviewer.ReviewerBottomBar = type("ReviewerBottomBar", (), {})
+    class FakeReviewer:
+        def onEnterKey(self):
+            self._enter_count = getattr(self, "_enter_count", 0) + 1
+        def replayAudio(self):
+            self._replay_count = getattr(self, "_replay_count", 0) + 1
+        def _shortcutKeys(self):
+            return [(" ", self.onEnterKey), (1, self.onEnterKey),
+                    (2, self.onEnterKey), ("r", self.replayAudio)]
+    fake_reviewer.Reviewer = FakeReviewer
     fake_qt = types.ModuleType("aqt.qt")
     fake_qt.QTimer = types.SimpleNamespace(singleShot=lambda ms, fn: None)
+    fake_qt.Qt = types.SimpleNamespace(Key=types.SimpleNamespace(Key_Return=1, Key_Enter=2))
     previous = (sys.modules.get("aqt"), sys.modules.get("aqt.qt"), sys.modules.get("aqt.reviewer"))
     package_before = {k:v for k,v in sys.modules.items() if k=="anki_ci_review_announcer" or k.startswith("anki_ci_review_announcer.")}
     oldenv = os.environ.pop("ANKI_A11Y_CI", None)
@@ -246,6 +256,30 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         self.assertIn("startup.toMML",html)
         self.assertIn('math.setAttribute("tabindex", "0")',html)
         self.assertNotIn('math.setAttribute("aria-label"',html)
+
+    def test_return_only_intercepts_focused_audio_link(self):
+        addon, hooks = load_addon({"enable_audio_replay_button": True})
+        Reviewer = hooks.webview_will_set_content[0].__globals__["Reviewer"]
+        instance = Reviewer()
+        js_calls = []
+        clicked = []
+        currently_audio_link = [True]
+        instance.web = types.SimpleNamespace(
+            evalWithCallback=lambda js, cb: (js_calls.append(js), cb(currently_audio_link[0])),
+            eval=lambda js: clicked.append(js)
+        )
+        shortcuts = dict(instance._shortcutKeys())
+        shortcuts[1]()
+        self.assertEqual(clicked,["document.activeElement.click();"])
+        self.assertEqual(getattr(instance,"_enter_count",0),0)
+        currently_audio_link[0] = False
+        shortcuts[2]()
+        self.assertEqual(instance._enter_count,1)
+        shortcuts[" "]()
+        self.assertEqual(instance._enter_count,2)
+        shortcuts["r"]()
+        self.assertEqual(instance._replay_count,1)
+        self.assertTrue(all("a.replay-button.soundLink" in js for js in js_calls))
 
     def test_native_replay_icon_keeps_original_keyboard_bridge(self):
         addon, hooks = load_addon({"enable_audio_replay_button":True})
