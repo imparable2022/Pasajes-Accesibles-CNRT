@@ -19,3 +19,4 @@ Create deck add card study grade and browse with keyboard and NVDA
     Add Card Via Keyboard
     Study With Keyboard
     Browser Via Keyboard
+    Study Fixture Decks Via Keyboard
