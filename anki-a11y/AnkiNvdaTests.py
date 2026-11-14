@@ -271,6 +271,30 @@ def read_card_content_strict(stage, expected):
     # evidence only; user-readable speech is still the passing requirement.
     capture("open NVDA find", "NVDA+control+f", 0.7)
     capture("dismiss NVDA find", "escape", 0.5)
+    # NVDA object navigation is a second, independent screen-reader path.
+    # QWebEngine often exposes an accessibility object tree even when NVDA's
+    # browse mode does not start. The name must still be spoken by real NVDA.
+    for label, gesture in [
+        ("move navigator to focus", "NVDA+numpadMinus"),
+        ("read current navigator object", "NVDA+numpad5"),
+        ("enter first child", "NVDA+numpad2"),
+    ]:
+        try:
+            if capture(label, gesture, 0.7):
+                note(f"{stage}_CONTENT_SPOKEN_BY_NVDA",expected=expected,gesture=gesture,source="object_navigation")
+                return True
+        except Exception as error:
+            note("object navigation unavailable", gesture=gesture,error=repr(error))
+    for i in range(18):
+        try:
+            if capture("next accessibility object "+str(i),"NVDA+numpad6",0.4):
+                note(f"{stage}_CONTENT_SPOKEN_BY_NVDA",expected=expected,
+                     gesture="NVDA+numpad6",source="object_navigation")
+                return True
+        except Exception as error:
+            note("object navigation stopped",error=repr(error))
+            break
+
     note("NVDA_CARD_READING_FAILURE", phase=stage, expected=expected, mode=mode,
          samples=[{"gesture":k,"speech":v[:500]} for k,v in observations])
     return False
