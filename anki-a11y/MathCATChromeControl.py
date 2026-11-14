@@ -44,8 +44,16 @@ def verify_mathcat_in_chrome():
             for gesture in ["space","downArrow","rightArrow","space","escape"]:
                 utterances.append({"gesture":gesture,"speech":NvdaLib.getSpeechAfterKey(gesture)})
         spoken = " ".join(str(v["speech"]) for v in utterances).casefold()
-        mathcat = ("not math" not in entry.casefold() and
-                  any(s in spoken for s in ["fraction","numerator","denominator","power","squared","cubed","equals"]))
+        # Seeing the word "math" is not success: in the first control run
+        # NVDA recognized a math object but its MathCAT engine reported
+        # "Error in starting navigation of math" and "Error in navigating math".
+        errors = [item["speech"] for item in utterances
+                  if "error in" in item["speech"].casefold() or "not math" in item["speech"].casefold()]
+        after_entry = " ".join(str(item["speech"]) for item in utterances[6:]).casefold()
+        mathcat = (not errors and
+                   "not math" not in entry.casefold() and
+                   any(token in after_entry for token in
+                       ("numerator","denominator","fraction","power","squared","cubed","equal")))
         records.append({"kind":kind,"entry":entry,"mathcat_usable":mathcat,"utterances":utterances})
         output.write_text(json.dumps(records,ensure_ascii=False,indent=2),encoding="utf-8")
         robot.log(f"Chrome MathCAT {kind}: {records[-1]}")
