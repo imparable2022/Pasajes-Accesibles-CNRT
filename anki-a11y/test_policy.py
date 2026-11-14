@@ -54,7 +54,7 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         addon, hooks = load_addon()
         self.assertFalse(addon.OPTIONS["announce_review_cards"])
         html = hooks.card_will_show[0]("<div>Question</div>", None, "reviewQuestion")
-        self.assertIn("if (!false) return;", html)
+        self.assertEqual(html, "<div>Question</div>")
 
     def test_unknown_context_unchanged(self):
         addon, hooks = load_addon()
@@ -70,9 +70,8 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         })
         q = hooks.card_will_show[0]("", None, "reviewQuestion")
         a = hooks.card_will_show[0]("", None, "reviewAnswer")
-        self.assertIn('const side = "question"', q)
+        self.assertEqual(q, "")
         self.assertIn('const side = "answer"', a)
-        self.assertIn("&& !false", q)
         self.assertIn("&& !true", a)
         self.assertIn("text.length > 1200", a)
 
@@ -83,6 +82,8 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         self.assertNotIn("text.slice(0, 1000)", js)
         self.assertIn("input", js)
         self.assertIn("img, svg, math", js)
+        self.assertIn("Question content", js)
+        self.assertIn("previousState.attrs", js)
         self.assertIn('content.focus({ preventScroll: true })', js.replace('qa.focus', 'content.focus'))
 
     def test_editor_labels_can_be_disabled_independently(self):
@@ -103,6 +104,19 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         self.assertIn("anki-editable", outputs[0])
         self.assertIn(".CodeMirror textarea", outputs[0])
         self.assertIn("MutationObserver", outputs[0])
+
+    def test_default_does_not_inject_or_mutate_review_html(self):
+        addon, hooks = load_addon()
+        before = '<div class="card"><img src="test.png" alt="diagram"></div>'
+        for context in ("reviewQuestion", "reviewAnswer"):
+            self.assertEqual(before, hooks.card_will_show[0](before, None, context))
+
+    def test_interactive_content_opt_in_is_not_enforced_by_removing_controls(self):
+        addon, hooks = load_addon({"announce_review_cards": True})
+        html = '<input id="typeans" aria-label="Type your answer">'
+        output = hooks.card_will_show[0](html, None, "reviewQuestion")
+        self.assertTrue(output.startswith(html))
+        self.assertIn("if (qa.querySelector(interactive.join", output)
 
     def test_javascript_is_valid(self):
         addon, hooks = load_addon({"announce_review_cards": True})
