@@ -23,6 +23,40 @@ screen-reader CI. It is not an upstream Anki change or a public release.
    NVDA spoke the exact test question and then **only the new answer**.
    Keyboard focus could still proceed to Show Answer, Good and Browse.
 
+## Expanded validation (Nov 14, 2026)
+
+[Windows GitHub Actions run 43623827708](https://github.com/imparable2022/Pasajes-Accesibles-CNRT/actions/runs/43623827708) is an important intermediate **green** run:
+
+- **13 policy/DOM tests passed**. The runtime harness executes the actual
+  reviewer JavaScript with simulated DOM states for images, math, audio, video,
+  long texts, tables, links, interactive buttons, typed-answer controls and
+  screen-reader-disabled defaults. It verifies focus remains unchanged for
+  incompatible content, semantics are restored between cards and long text
+  is not silently truncated. These are deterministic policy tests, **not**
+  genuine NVDA assertions about media content.
+- **One real Anki/NVDA journey passed**: create deck and note, read and grade a
+  Basic card, then open **8 native fixture decks** produced through Anki's
+  Collection API and complete keyboard study/answer/grading in each:
+  Image, MathJax, Audio, Long, Typed answer, Cloze, Table and Interactive.
+  Typed-answer focus was preserved; incompatible rich cards were not
+  overridden with a false `aria-label`. The fixture loader is CI-only and
+  never writes directly to SQLite.
+- **A separate real Anki no-screen-reader keyboard smoke passed** after the
+  NVDA tests shut down. It checks that NVDA, Narrator and JAWS processes are
+  absent, disables review focus in the isolated profile, opens Browse and Add
+  by keyboard, traverses 12 Tab stops with a Windows focus handle and exits.
+
+**Scope of claims:** a green multimodal keyboard smoke means the screens,
+controls and review transitions remain keyboard-operable. It does **not**
+prove that NVDA understands the image alt text, speaks mathematical structure,
+or can control audio without additional work. The tested non-AT keyboard
+journey does not establish equivalence for JAWS, Narrator, VoiceOver or Orca;
+those tools are not actually driving these tests.
+
+The follow-on cloze assertion checks that NVDA announces the *revealed* cloze
+deletion, rather than just repeating the question or ignoring a changed span.
+See newer workflow runs for its outcome.
+
 ## Configuration
 
 `config.json` has:
@@ -33,6 +67,10 @@ screen-reader CI. It is not an upstream Anki change or a public release.
 - `max_auto_speech_characters`: `800`; content longer than this is left alone
   rather than being silently truncated. Hard limit 3,000.
 - `label_editor_fields`: `true`; independent of reviewer narration.
+- `focus_noninteractive_rich_cards`: `false` by default; optional keyboard
+  focus to a semantic Question/Answer region for complex noninteractive cards
+  without replacing their accessible hierarchy with the full card text. This
+  is not yet NVDA-validated across all content types.
 
 For the CI E2E the test explicitly writes a configuration with narration
 enabled into a disposable Anki profile. No other user profile is modified.
