@@ -133,6 +133,10 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
             {"name":"plain-question", "source":question, "text":"Sample question"},
             {"name":"plain-answer", "source":answer, "text":"Sample question New answer",
              "previousQuestion":"Sample question", "answerMarker":True},
+            {"name":"cloze-reveal", "source":answer,
+             "text":"The telescope collects light.",
+             "previousQuestion":"The [...] collects light.",
+             "clozeItems":["telescope"], "answerMarker":False},
             {"name":"answer-with-no-known-boundary", "source":answer,
              "text":"Standalone answer", "previousQuestion":"", "answerMarker":False},
             {"name":"long-question", "source":question, "text":"X"*900},
@@ -156,6 +160,7 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         for name, label in [
             ("plain-question", "Sample question"),
             ("plain-answer", "New answer"),
+            ("cloze-reveal", "telescope"),
         ]:
             self.assertEqual(data[name]["focusCount"], 1, name)
             self.assertEqual(data[name]["active"], "card", name)
