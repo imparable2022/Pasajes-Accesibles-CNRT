@@ -10,12 +10,15 @@ This is still a test prototype, not a verified universal solution.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from aqt import gui_hooks, mw
 from aqt.qt import QTimer
 
 HERE = Path(__file__).resolve().parent
-HERE.joinpath("loaded.marker").write_text("loaded", encoding="utf-8")
+CI_MODE = os.environ.get("ANKI_A11Y_CI") == "1"
+if CI_MODE:
+    HERE.joinpath("loaded.marker").write_text("loaded", encoding="utf-8")
 
 DEFAULTS = {
     "announce_review_cards": False,
@@ -185,7 +188,8 @@ def _card_hook(html: str, card, context: str) -> str:
     if context not in ("reviewQuestion", "reviewAnswer"):
         return html
     side = "question" if context == "reviewQuestion" else "answer"
-    HERE.joinpath("card-hook.marker").write_text(side, encoding="utf-8")
+    if CI_MODE:
+        HERE.joinpath("card-hook.marker").write_text(side, encoding="utf-8")
     script = (
         REVIEW_JS.replace("__ENABLED__", json.dumps(bool(OPTIONS["announce_review_cards"])))
         .replace("__QUESTION_ENABLED__", json.dumps(bool(OPTIONS["announce_questions"])))
@@ -198,7 +202,8 @@ def _card_hook(html: str, card, context: str) -> str:
 def _editor_note_loaded(editor) -> None:
     if not OPTIONS["label_editor_fields"]:
         return
-    HERE.joinpath("editor-hook.marker").write_text("called", encoding="utf-8")
+    if CI_MODE:
+        HERE.joinpath("editor-hook.marker").write_text("called", encoding="utf-8")
     editor.web.eval(EDITOR_JS)
 
 gui_hooks.card_will_show.append(_card_hook)
@@ -227,5 +232,6 @@ def _debug_state(side):
         mw.reviewer.web.evalWithCallback(code, callback)
     QTimer.singleShot(1800, capture)
 
-gui_hooks.reviewer_did_show_question.append(lambda card: _debug_state("question"))
-gui_hooks.reviewer_did_show_answer.append(lambda card: _debug_state("answer"))
+if CI_MODE:
+    gui_hooks.reviewer_did_show_question.append(lambda card: _debug_state("question"))
+    gui_hooks.reviewer_did_show_answer.append(lambda card: _debug_state("answer"))
