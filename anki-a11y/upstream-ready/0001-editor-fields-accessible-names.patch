@@ -1,6 +1,3 @@
-# Proposed upstream patch: editor field accessible names
-# Based on upstream ankitects/anki main as inspected 2026-11-14.
-# Adds accessible names to actual rich-text and CodeMirror focus targets.
 diff --git a/ts/routes/editor/NoteEditor.svelte b/ts/routes/editor/NoteEditor.svelte
 --- a/ts/routes/editor/NoteEditor.svelte
 +++ b/ts/routes/editor/NoteEditor.svelte
