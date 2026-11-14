@@ -208,35 +208,80 @@ def add_card_via_keyboard():
     # review actually reads both sides of the newly-created card.
     press("close Add via Escape","escape",0.8)
 
+def read_card_content_strict(stage, expected):
+    """Prove NVDA can independently speak the specified card text using
+    ordinary keyboard review / browse gestures, not Anki internals.
+
+    Speech must include the exact known test content. A green workflow without
+    this evidence would not establish accessible studying.
+    """
+    observations = []
+    def capture(label, keys, sec=0.5):
+        spoken = press(f"{stage}: {label}", keys, sec)
+        observations.append((label, spoken))
+        return expected.casefold() in spoken.casefold()
+
+    # Anki sets focus to a Qt webview after updating the review card; its
+    # virtual cursor may not be positioned at the question/answer.
+    # These are the same browse-mode gestures a screen-reader user can use.
+    for label, keys, sec in [
+        ("report focus", "NVDA+tab", 0.5),
+        ("move to document start", "control+home", 0.6),
+        ("read first line", "downArrow", 0.7),
+        ("read second line", "downArrow", 0.7),
+        ("read current line", "NVDA+upArrow", 0.7),
+        ("read all from cursor", "NVDA+downArrow", 1.5),
+        ("move to document top again", "control+home", 0.4),
+    ]:
+        if capture(label, keys, sec):
+            note(f"{stage}_CONTENT_SPOKEN_BY_NVDA", expected=expected, gesture=keys)
+            return
+    for i in range(15):
+        if capture(f"browse next line {i+1}", "downArrow", 0.45):
+            note(f"{stage}_CONTENT_SPOKEN_BY_NVDA", expected=expected, gesture="downArrow")
+            return
+
+    # Some QWebEngine views start NVDA in focus mode. Explicitly toggle to
+    # browse mode, then navigate document text; keep raw mode speech evidence.
+    mode = press(f"{stage}: toggle NVDA mode", "NVDA+space", 0.8)
+    observations.append(("toggle mode", mode))
+    for label, keys, sec in [
+        ("browse document start", "control+home", 0.6),
+        ("browse first line", "downArrow", 0.8),
+        ("browse second line", "downArrow", 0.8),
+        ("browse read line", "NVDA+upArrow", 0.6),
+        ("browse read all", "NVDA+downArrow", 1.5),
+    ]:
+        if capture(label, keys, sec):
+            note(f"{stage}_CONTENT_SPOKEN_BY_NVDA", expected=expected, gesture=keys, mode=mode)
+            return
+    for i in range(15):
+        if capture(f"browse subsequent line {i+1}", "downArrow", 0.45):
+            note(f"{stage}_CONTENT_SPOKEN_BY_NVDA", expected=expected, gesture="downArrow", mode=mode)
+            return
+
+    note("NVDA_CARD_READING_FAILURE", phase=stage, expected=expected, mode=mode,
+         samples=[{"gesture":k,"speech":v[:500]} for k,v in observations])
+    raise AssertionError(f"NVDA did not announce {stage} card text through keyboard: {expected}")
+
 def study_with_keyboard():
     activate_anki()
-    press("return to decks","d",1.2)
-    select_button([DECK],limit=24)
-    press("open selected deck","enter",1.3)
-    note("deck opened",title=focus_title())
-    # Unlike a silent bare 's' shortcut, a real native HTML Study Now
-    # control has an observable accessible name and keyboard activation.
-    select_button(["Study Now","Estudiar ahora"],limit=18)
-    transition=press("activate Study Now","enter",1.3)
-    note("study screen",transition=transition,focused=focus_description())
-    traces=[transition, focus_description()]
-    traces.append(press("read question with NVDA", "NVDA+downArrow",1.2))
-    traces.append(press("move to question start", "control+home",0.4))
-    traces.append(press("read from start", "NVDA+downArrow",1.2))
-    if not any(FRONT.casefold() in x.casefold() for x in traces):
-        note("ACCESSIBILITY_FINDING",issue="Question content not spoken in NVDA read-all",traces=traces)
-    # Independently verify whether the show-answer control is keyboard reachable.
-    select_button(["Show Answer","Mostrar respuesta"],limit=18)
-    announced=press("show answer via keyboard","enter",1.1)
-    answer_traces=[announced, focus_description()]
-    answer_traces.append(press("read revealed answer","NVDA+downArrow",1.5))
-    if not any(BACK.casefold() in x.casefold() for x in answer_traces):
-        note("ACCESSIBILITY_FINDING",issue="Answer content not spoken in NVDA read-all",traces=answer_traces)
-    note("ANSWER_DISPLAY_STEP_COMPLETED")
-    # 'Good' may be 2 or 3 depending on the number of review buttons.
-    select_button(["Good","Bien","Easy","Fácil"],limit=18)
-    press("grade card with accessible button","enter",1.1)
-    note("REVIEW_GRADE_STEP_COMPLETED")
+    press("return to decks", "d", 1.2)
+    select_button([DECK], limit=24)
+    press("open selected deck", "enter", 1.3)
+    note("deck opened", title=focus_title())
+    select_button(["Study Now", "Estudiar ahora"], limit=18)
+    press("activate Study Now", "enter", 1.5)
+    note("study screen", focused=focus_description())
+
+    # Strict assertions: test only passes if NVDA genuinely voices each side.
+    read_card_content_strict("QUESTION", FRONT)
+    select_button(["Show Answer", "Mostrar respuesta"], limit=18)
+    press("show answer via keyboard", "enter", 1.3)
+    read_card_content_strict("ANSWER", BACK)
+    select_button(["Good", "Bien"], limit=18)
+    press("grade card with accessible button", "enter", 1.0)
+    note("REVIEW_GRADED_AFTER_STRICT_NVDA_READING")
 
 def browser_via_keyboard():
     activate_anki()
