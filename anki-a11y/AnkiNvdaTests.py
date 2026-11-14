@@ -338,7 +338,7 @@ def study_with_keyboard():
     idx = spy.get_next_speech_index()
     transition = press("activate Study Now", "enter", 1.6)
     robot.sleep("2 seconds")
-    question_auto = transition + "\\n" + spy.get_speech_at_index_until_now(idx)
+    question_auto = spy.get_speech_at_index_until_now(idx)
     addon_root = data_dir / "addons21" / "anki_ci_review_announcer"
     note("REVIEW_ADDON_HOOK_STATUS",
          webview_hook=(addon_root / "webview-hook.marker").exists(),
@@ -353,7 +353,7 @@ def study_with_keyboard():
     idx = spy.get_next_speech_index()
     transition = press("show answer via keyboard", "enter", 1.4)
     robot.sleep("2 seconds")
-    answer_auto = transition + "\\n" + spy.get_speech_at_index_until_now(idx)
+    answer_auto = spy.get_speech_at_index_until_now(idx)
     answer_auto_ok = BACK.casefold() in answer_auto.casefold()
     note("ANSWER_AUTOMATIC_NVDA", spoken=answer_auto[:1500], success=answer_auto_ok)
     answer_spoken = read_card_content_strict("ANSWER", BACK)
