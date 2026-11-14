@@ -457,10 +457,15 @@ def _speech_probe(kind):
         # only tried NVDA+Alt+M *after* moving the review cursor away.
         entered_speech = press(f"{kind}: enter MathCAT directly", "NVDA+alt+m", 1.1)
         spoken_segments = [entered_speech]
-        for gesture in ["space", "downArrow", "rightArrow", "space"]:
-            spoken_segments.append(press(f"{kind}: MathCAT structure "+gesture,
-                                         gesture, 0.75))
-        press(f"{kind}: leave MathCAT", "escape", 0.5)
+        # Space is Anki's Show Answer shortcut when NOT in MathCAT!
+        # Never issue MathCAT gestures until the math-mode command has
+        # actually activated. This was the source of spurious review errors.
+        entered_mode = "not math" not in entered_speech.casefold() and bool(entered_speech.strip())
+        if entered_mode:
+            for gesture in ["space", "downArrow", "rightArrow", "space"]:
+                spoken_segments.append(press(f"{kind}: MathCAT structure "+gesture,
+                                             gesture, 0.75))
+            press(f"{kind}: leave MathCAT", "escape", 0.5)
         combined = " ".join(spoken_segments).casefold()
         entered = "not math" not in combined and bool(combined.strip()) and (
             any(term in combined for term in
@@ -503,26 +508,6 @@ def _speech_probe(kind):
             except Exception as err:
                 samples.append({"gesture":gesture,"error":repr(err)})
                 break
-    if kind.startswith("Math"):
-        # MathCAT is the NVDA 2026 mathematical interaction engine.
-        # This is a user gesture, not a DOM/MathML read from Python.
-        for step, gesture in [
-            ("focus current object", "NVDA+numpadMinus"),
-            ("enter document", "NVDA+numpad2"),
-            ("move to mathematical child", "NVDA+numpad6"),
-            ("descend into equation", "NVDA+numpad2"),
-            ("MathCAT: interact", "NVDA+alt+m"),
-            ("MathCAT: read current", "space"),
-            ("MathCAT: zoom in", "downArrow"),
-            ("MathCAT: move right", "rightArrow"),
-            ("MathCAT: read fraction/exponent piece", "space"),
-            ("MathCAT: exit", "escape"),
-        ]:
-            try:
-                spoken=press(f"{kind} {step}",gesture,.6)
-                samples.append({"gesture":gesture,"speech":spoken})
-            except Exception as err:
-                samples.append({"gesture":gesture,"error":repr(err)})
     note("NVDA_SEMANTIC_SPEECH_PROBE",kind=kind,samples=samples[-40:])
     return " ".join(s.get("speech", "") for s in samples).casefold()
 
