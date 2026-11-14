@@ -1,4 +1,4 @@
-name: Anki accessibility prototypes - MathCAT/audio fast regression
+name: Anki accessibility prototypes - math/audio links and MathML policy
 on:
   push:
     branches: [audit/anki-a11y-generalized-2026-11]
