@@ -1,0 +1,62 @@
+name: Anki upstream editor accessibility patch type-check
+on:
+  push:
+    branches: [audit/anki-a11y-generalized-2026-11]
+    paths:
+      - "anki-a11y/upstream-ready/**"
+      - ".github/workflows/anki-upstream-editor-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upstream-editor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout proposed patch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact inspected upstream Anki revision
+        uses: actions/checkout@v4
+        with:
+          repository: ankitects/anki
+          ref: 827f4aa42681f1d60ab0fe4ad76eb75d767a385e
+          path: upstream-anki
+          persist-credentials: false
+
+      - name: Apply separate editor accessibility patch
+        working-directory: upstream-anki
+        run: |
+          git apply --check ../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch
+          git apply ../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch
+          git diff --check
+          git diff --stat
+
+      - name: Set up upstream supported Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install original upstream Yarn dependencies
+        working-directory: upstream-anki
+        run: |
+          corepack enable
+          yarn install --immutable
+
+      - name: Compile-check Svelte editor changes
+        working-directory: upstream-anki
+        run: yarn svelte-check:once
+
+      - name: Verify only editor files changed
+        working-directory: upstream-anki
+        run: |
+          git diff --name-only > /tmp/anki-patch-changed-files.txt
+          cat /tmp/anki-patch-changed-files.txt
+          if grep -Ev '^ts/routes/editor/(NoteEditor.svelte|CodeMirror.svelte|plain-text-input/PlainTextInput.svelte|rich-text-input/RichTextInput.svelte)$' /tmp/anki-patch-changed-files.txt; then
+            echo "Unexpected files modified by patch"
+            exit 1
+          fi
