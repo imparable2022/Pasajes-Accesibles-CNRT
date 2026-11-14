@@ -19,7 +19,8 @@ def load_addon(options=None):
     hooks = types.SimpleNamespace(**{
         key: [] for key in (
             "card_will_show", "editor_did_load_note",
-            "reviewer_did_show_question", "reviewer_did_show_answer"
+            "reviewer_did_show_question", "reviewer_did_show_answer",
+            "webview_will_set_content", "webview_did_receive_js_message"
         )
     })
     mw = types.SimpleNamespace(addonManager=types.SimpleNamespace(
@@ -28,21 +29,24 @@ def load_addon(options=None):
     fake_aqt = types.ModuleType("aqt")
     fake_aqt.gui_hooks = hooks
     fake_aqt.mw = mw
+    fake_reviewer = types.ModuleType("aqt.reviewer")
+    fake_reviewer.ReviewerBottomBar = type("ReviewerBottomBar", (), {})
     fake_qt = types.ModuleType("aqt.qt")
     fake_qt.QTimer = types.SimpleNamespace(singleShot=lambda ms, fn: None)
-    previous = (sys.modules.get("aqt"), sys.modules.get("aqt.qt"))
+    previous = (sys.modules.get("aqt"), sys.modules.get("aqt.qt"), sys.modules.get("aqt.reviewer"))
     package_before = {k:v for k,v in sys.modules.items() if k=="anki_ci_review_announcer" or k.startswith("anki_ci_review_announcer.")}
     oldenv = os.environ.pop("ANKI_A11Y_CI", None)
     try:
         sys.modules["aqt"] = fake_aqt
         sys.modules["aqt.qt"] = fake_qt
+        sys.modules["aqt.reviewer"] = fake_reviewer
         spec = importlib.util.spec_from_file_location("anki_ci_review_announcer", ADDON_FILE)
         module = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
         return module, hooks
     finally:
-        for k, prior in zip(("aqt", "aqt.qt"), previous):
+        for k, prior in zip(("aqt", "aqt.qt", "aqt.reviewer"), previous):
             if prior is None:
                 sys.modules.pop(k, None)
             else:
@@ -226,6 +230,42 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         self.assertEqual(data["initial"], {"rich":"Front","plain":"Front"})
         self.assertEqual(data["updated"], {"rich":"Mi pregunta","plain":"Mi pregunta"})
         self.assertGreaterEqual(data["observerCount"], 1)
+
+
+    def test_mathml_focus_stays_off_without_optin(self):
+        addon, hooks = load_addon()
+        self.assertFalse(addon.OPTIONS["experimental_mathml_focus"])
+        self.assertEqual(len(hooks.card_will_show),2)
+        self.assertEqual(hooks.card_will_show[1]("Math",None,"reviewQuestion"),"Math")
+
+    def test_mathml_opt_in_preserves_structured_math(self):
+        addon, hooks = load_addon({"experimental_mathml_focus": True})
+        html = hooks.card_will_show[1]("",None,"reviewQuestion")
+        self.assertIn("onShownHook.push",html)
+        self.assertIn("mjx-assistive-mml math",html)
+        self.assertIn("startup.toMML",html)
+        self.assertIn('math.setAttribute("tabindex", "0")',html)
+        self.assertNotIn('math.setAttribute("aria-label"',html)
+
+    def test_audio_button_is_opt_in_and_reuses_reviewer_replay(self):
+        addon, hooks = load_addon({"enable_audio_replay_button":True})
+        # The mock aqt module is removed when load_addon exits; grab its
+        # type from the captured hook function environment.
+        Bar = hooks.webview_will_set_content[0].__globals__["ReviewerBottomBar"]
+        bar = Bar()
+        calls=[]
+        bar.reviewer=types.SimpleNamespace(card=object(),state="question",
+                                           replayAudio=lambda:calls.append("replayed"))
+        web=types.SimpleNamespace(body='<td align=start valign=top class=stat></td>')
+        hooks.webview_will_set_content[0](web,bar)
+        self.assertIn('aria-label="Replay audio (R)"',web.body)
+        self.assertIn(" hidden>",web.body)
+        result = hooks.webview_did_receive_js_message[0](
+            (False,None), "anki-a11y-replay-current-audio", bar)
+        self.assertEqual(result,(True,None))
+        self.assertEqual(calls,["replayed"])
+        self.assertEqual(hooks.webview_did_receive_js_message[0](
+            (False,None), "unrelated", bar),(False,None))
 
     def test_javascript_is_valid(self):
         addon, hooks = load_addon({"announce_review_cards": True})
