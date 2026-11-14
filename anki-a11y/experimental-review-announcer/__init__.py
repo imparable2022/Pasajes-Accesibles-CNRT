@@ -50,7 +50,7 @@ def prepare_card(html, card, context):
 onShownHook.push(() => {{
     const content = document.getElementById('qa');
     const live = document.getElementById('anki-ci-review-announcer');
-    if (!content || !live) return;
+    if (!content) return;
     const text = content.innerText.trim();
     if (!text) return;
     // Focus rendered content as a named accessibility node. This is an
@@ -58,13 +58,15 @@ onShownHook.push(() => {{
     content.tabIndex = -1;
     content.setAttribute('role', 'group');
     content.setAttribute('aria-label', text.slice(0, 1000));
-    content.focus({ preventScroll: true });
+    content.focus({{ preventScroll: true }});
     // A cleared, stable region avoids relying on focus moving to the text.
-    live.textContent = '';
-    setTimeout(() => {{
-      if (document.getElementById('anki-ci-review-announcer') !== live) return;
-      live.textContent = text;
-    }}, 140);
+    if (live) {{
+      live.textContent = '';
+      setTimeout(() => {{
+        if (document.getElementById('anki-ci-review-announcer') !== live) return;
+        live.textContent = text;
+      }}, 140);
+    }}
 }});
 </script>
 """
