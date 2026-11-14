@@ -4,7 +4,8 @@ This uses exactly the same Reviewer.replayAudio() as the built-in R/F5 keys;
 there is no parallel media player, audio duplication, or interception of R.
 """
 from . import HERE, OPTIONS, CI_MODE, gui_hooks
-from aqt.reviewer import ReviewerBottomBar
+from aqt.reviewer import Reviewer, ReviewerBottomBar
+from aqt.qt import Qt
 
 BRIDGE = "anki-a11y-replay-current-audio"
 BUTTON_ID = "anki-a11y-replay-audio"
@@ -92,7 +93,40 @@ onShownHook.push(() => {
 """
     return html + script
 
+def install_audio_link_return_shortcut():
+    """Preserve Space-to-answer and R/F5 replay, while making Return on an
+    actually focused audio link activate the link, not show the answer.
+    """
+    if not OPTIONS.get("enable_audio_replay_button", False):
+        return
+    if getattr(Reviewer, "_anki_a11y_return_hook_installed", False):
+        return
+    original = Reviewer._shortcutKeys
+
+    def keys_with_accessible_return(self):
+        bindings = list(original(self))
+
+        def on_return():
+            js = """(function() {
+              const target = document.activeElement;
+              return Boolean(target?.matches('a.replay-button.soundLink'));
+            })()"""
+            def completed(is_audio_link):
+                if is_audio_link:
+                    self.web.eval("document.activeElement.click();")
+                else:
+                    self.onEnterKey()
+            self.web.evalWithCallback(js, completed)
+
+        return [
+            (key, on_return if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) else action)
+            for key, action in bindings
+        ]
+    Reviewer._shortcutKeys = keys_with_accessible_return
+    Reviewer._anki_a11y_return_hook_installed = True
+
 def register_audio_hooks():
+    install_audio_link_return_shortcut()
     gui_hooks.card_will_show.append(label_existing_icons)
     gui_hooks.webview_will_set_content.append(inject_button)
     gui_hooks.webview_did_receive_js_message.append(handle_command)
