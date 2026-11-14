@@ -273,6 +273,9 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
             hooks.card_will_show[0]("", None, "reviewQuestion"),
             hooks.card_will_show[0]("", None, "reviewAnswer"),
             addon.EDITOR_JS,
+            hooks.card_will_show[1]("", None, "reviewQuestion")
+            if addon.OPTIONS.get("experimental_mathml_focus", False)
+            else "",
         ]
         with tempfile.TemporaryDirectory() as temp:
             for index, source in enumerate(programs):
