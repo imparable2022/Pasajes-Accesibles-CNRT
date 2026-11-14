@@ -235,11 +235,11 @@ def read_card_content_strict(stage, expected):
     ]:
         if capture(label, keys, sec):
             note(f"{stage}_CONTENT_SPOKEN_BY_NVDA", expected=expected, gesture=keys)
-            return
+            return True
     for i in range(15):
         if capture(f"browse next line {i+1}", "downArrow", 0.45):
             note(f"{stage}_CONTENT_SPOKEN_BY_NVDA", expected=expected, gesture="downArrow")
-            return
+            return True
 
     # Some QWebEngine views start NVDA in focus mode. Explicitly toggle to
     # browse mode, then navigate document text; keep raw mode speech evidence.
@@ -254,15 +254,26 @@ def read_card_content_strict(stage, expected):
     ]:
         if capture(label, keys, sec):
             note(f"{stage}_CONTENT_SPOKEN_BY_NVDA", expected=expected, gesture=keys, mode=mode)
-            return
+            return True
     for i in range(15):
         if capture(f"browse subsequent line {i+1}", "downArrow", 0.45):
             note(f"{stage}_CONTENT_SPOKEN_BY_NVDA", expected=expected, gesture="downArrow", mode=mode)
-            return
+            return True
 
+    # Re-enter the main review document with Tab / Shift+Tab (no mouse) and
+    # sample the first lines again. This tests whether focus positioning,
+    # rather than actual document semantics, caused the apparent silence.
+    for k in ["tab", "shift+tab", "NVDA+tab", "control+home", "downArrow", "NVDA+upArrow"]:
+        capture("refocus document " + k, k, 0.55)
+
+    # NVDA browse-mode Find searches the virtual-buffer *accessibility* text,
+    # not the Anki HTML implementation. A successful match is supporting
+    # evidence only; user-readable speech is still the passing requirement.
+    capture("open NVDA find", "NVDA+control+f", 0.7)
+    capture("dismiss NVDA find", "escape", 0.5)
     note("NVDA_CARD_READING_FAILURE", phase=stage, expected=expected, mode=mode,
          samples=[{"gesture":k,"speech":v[:500]} for k,v in observations])
-    raise AssertionError(f"NVDA did not announce {stage} card text through keyboard: {expected}")
+    return False
 
 def study_with_keyboard():
     activate_anki()
@@ -275,13 +286,15 @@ def study_with_keyboard():
     note("study screen", focused=focus_description())
 
     # Strict assertions: test only passes if NVDA genuinely voices each side.
-    read_card_content_strict("QUESTION", FRONT)
+    question_spoken = read_card_content_strict("QUESTION", FRONT)
     select_button(["Show Answer", "Mostrar respuesta"], limit=18)
     press("show answer via keyboard", "enter", 1.3)
-    read_card_content_strict("ANSWER", BACK)
+    answer_spoken = read_card_content_strict("ANSWER", BACK)
     select_button(["Good", "Bien"], limit=18)
     press("grade card with accessible button", "enter", 1.0)
-    note("REVIEW_GRADED_AFTER_STRICT_NVDA_READING")
+    note("REVIEW_GRADED_AFTER_STRICT_NVDA_READING", question_spoken=question_spoken, answer_spoken=answer_spoken)
+    if not question_spoken or not answer_spoken:
+        raise AssertionError(f"NVDA text-reading strict criterion failed: question={question_spoken}, answer={answer_spoken}")
 
 def browser_via_keyboard():
     activate_anki()
