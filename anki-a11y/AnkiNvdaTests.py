@@ -120,9 +120,22 @@ def start_anki():
                 "label_editor_fields": True}
     (target / "config.json").write_text(json.dumps(settings), encoding="utf-8")
     note("TEST_ADDON_INSTALLED", path=str(target), options=settings)
-    process=subprocess.Popen([exe,"-b",str(data_dir)])
-    robot.sleep("13 seconds")
-    activate_anki()
+    logfile = out / "anki-startup.log"
+    logfp = logfile.open("w", encoding="utf-8")
+    process=subprocess.Popen([exe,"-b",str(data_dir)], stdout=logfp,
+                             stderr=subprocess.STDOUT)
+    logfp.close()
+    start = time.monotonic()
+    while True:
+        robot.sleep("2 seconds")
+        try:
+            activate_anki()
+            break
+        except AssertionError:
+            if process.poll() is not None or time.monotonic()-start > 40:
+                log = logfile.read_text(encoding="utf-8", errors="replace")[-5000:]
+                note("ANKI_STARTUP_FAILURE", process_exit=process.poll(), log=log)
+                raise AssertionError(f"Anki did not show a window; exit={process.poll()}, log={log!r}")
     title=focus_title()
     if not title.strip(): raise AssertionError("NVDA did not announce any Anki window title")
     # The first launch displays a language picker. In the previous CI run,
