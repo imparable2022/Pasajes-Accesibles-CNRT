@@ -49,6 +49,10 @@ MATH_FOCUS_JS = r"""
     }
     if (!math) continue;
     if (math.localName !== "math") continue;
+    // Qt WebEngine exposes the native MathML as role "unknown" to NVDA.
+    // Try an explicit ARIA math role without linearizing or duplicating
+    // the equation. This is a controlled experiment, not an upstream fix.
+    math.setAttribute("role", "math");
     math.setAttribute("tabindex", "0");
     results.push(math);
     report.sample = math.outerHTML.slice(0,1200);
