@@ -23,6 +23,8 @@ PREFIX = "NVDA Fixture - "
 CASES = [
     ("Image", "Basic", "Accessible image: <img src='fixture-green.png' alt='Green square on white background'>", "Image answer"),
     ("Math", "Basic", r"Equation: \(\frac{1}{2} + \frac{1}{4}\)", "Three quarters"),
+    ("MathExponent", "Basic", r"Exponent: \\(x^2 + y^3\\)", "Powers answer"),
+    ("MathEquation", "Basic", r"Equation: \\(2x+3=7\\)", "x equals 2"),
     ("Audio", "Basic", "Listen: [sound:fixture-tone.wav]", "Audio answer"),
     ("Long", "Basic", "Read the full explanation. " + ("Many meaningful words are shown here. " * 42), "Long answer"),
     ("Typed", "Basic (type in the answer)", "Type the name of the animal", "cat"),
@@ -87,4 +89,21 @@ def install_fixture_cards():
     RESULTS.write_text(json.dumps({"cases":rows},indent=2),encoding="utf-8")
     mw.reset()
 
+AUDIO_EVENTS = HERE / "audio-events.json"
+_audio_events = []
+
+def _log_audio(kind, detail):
+    _audio_events.append({"event": kind, "detail": str(detail)[:180]})
+    AUDIO_EVENTS.write_text(json.dumps(_audio_events, indent=2), encoding="utf-8")
+
+def _record_replay(webview, card, is_front_side):
+    _log_audio("user_replay", {"card": int(card.id), "front": is_front_side})
+
+def _record_play(tag):
+    _log_audio("play_request", type(tag).__name__ + ": " + str(tag))
+
+# Observe Anki's own playback hooks. A play request is not proof that audio
+# reached a physical sound device in the GitHub runner.
+gui_hooks.audio_will_replay.append(_record_replay)
+gui_hooks.av_player_will_play.append(_record_play)
 gui_hooks.profile_did_open.append(lambda: QTimer.singleShot(900, install_fixture_cards))
