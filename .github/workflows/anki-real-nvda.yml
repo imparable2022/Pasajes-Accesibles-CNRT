@@ -87,6 +87,12 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "NVDA Robot suite exit $LASTEXITCODE" }
           } finally { Pop-Location }
 
+      - name: Verify ordinary keyboard navigation with no screen reader
+        shell: pwsh
+        env:
+          ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\a11y
+        run: python anki-a11y/AnkiNoAtKeyboard.py
+
       - name: Print NVDA speech trace for diagnosis
         if: always()
         shell: pwsh
@@ -105,6 +111,8 @@ jobs:
           path: |
             out/a11y/speech.json
             out/a11y/anki-startup.log
+            out/a11y/no-at-keyboard.json
+            out/a11y/no-at-anki-startup.log
             out/a11y/output.xml
             out/a11y/log.html
             out/a11y/report.html
