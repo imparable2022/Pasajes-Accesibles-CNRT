@@ -268,7 +268,7 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
             (False,None), "unrelated", bar),(False,None))
 
     def test_javascript_is_valid(self):
-        addon, hooks = load_addon({"announce_review_cards": True})
+        addon, hooks = load_addon({"announce_review_cards": True, "experimental_mathml_focus": True})
         programs = [
             hooks.card_will_show[0]("", None, "reviewQuestion"),
             hooks.card_will_show[0]("", None, "reviewAnswer"),
