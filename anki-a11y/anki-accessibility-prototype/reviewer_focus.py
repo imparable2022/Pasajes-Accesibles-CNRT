@@ -149,6 +149,21 @@ def _debug_state(side):
                 aria:qa?.getAttribute("aria-label"),
                 active:document.activeElement?.id,
                 previous:window.__ankiA11yPreviousQuestion,
+                math:{
+                    containerCount: qa?.querySelectorAll("mjx-container").length || 0,
+                    nativeMathCount: qa?.querySelectorAll("math").length || 0,
+                    assistiveCount: qa?.querySelectorAll("mjx-assistive-mml math").length || 0,
+                    firstContainer:qa?.querySelector("mjx-container")?.outerHTML?.slice(0,1600),
+                    firstMath:qa?.querySelector("math")?.outerHTML?.slice(0,1500),
+                    report:window.__ankiA11yMathReport,
+                    activeTag:document.activeElement?.tagName,
+                    activeOuter:document.activeElement?.outerHTML?.slice(0,450)
+                },
+                mathjax: {
+                    version:window.MathJax?.version,
+                    toMML:typeof window.MathJax?.startup?.toMML,
+                    mathItems:window.MathJax?.startup?.document?.math?.length
+                },
             });
         })()'''
         def callback(value):
