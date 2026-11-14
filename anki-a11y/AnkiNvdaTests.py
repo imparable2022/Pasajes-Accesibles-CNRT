@@ -114,6 +114,10 @@ def start_anki():
     src = Path(os.environ["ANKI_A11Y_ADDON_SOURCE"])
     target = data_dir / "addons21" / "anki_ci_review_announcer"
     shutil.copytree(src, target, dirs_exist_ok=True)
+    fixture_src = Path(os.environ["ANKI_A11Y_FIXTURE_SOURCE"])
+    fixture_target = data_dir / "addons21" / "anki_ci_fixtures"
+    shutil.copytree(fixture_src, fixture_target, dirs_exist_ok=True)
+    note("FIXTURE_LOADER_INSTALLED", path=str(fixture_target))
     # Isolated test profile explicitly opts into automatic narration.
     settings = {"announce_review_cards": True, "announce_questions": True,
                 "announce_answers": True, "max_auto_speech_characters": 800,
@@ -172,6 +176,16 @@ def start_anki():
              process_exit=process.poll())
         raise AssertionError("Experimental accessibility add-on did not load; inspect ADDON_LOAD_FAILURE")
     note("TEST_ADDON_LOADED", marker=str(marker))
+    fixture_report = fixture_target / "fixtures.json"
+    if not fixture_report.exists():
+        raise AssertionError("Native Anki fixture loader did not execute")
+    fixture_result = json.loads(fixture_report.read_text(encoding="utf-8"))
+    note("FIXTURE_CREATION_REPORT", report=fixture_result)
+    failed = [x for x in fixture_result.get("cases", [])
+              if x.get("status") not in ("created","already-present")]
+    if failed:
+        raise AssertionError("Anki fixture generation not completely successful: " + repr(failed))
+
     note("post-language-setup", title=focus_title(),
          focused=focus_description(),
          folder_contents=[str(p.relative_to(data_dir)) for p in data_dir.rglob("*")][:40])
