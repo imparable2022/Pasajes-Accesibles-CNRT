@@ -109,16 +109,30 @@ def activate_anki():
 def start_anki():
     global process
     exe=os.environ["ANKI_EXE"]
-    data_dir.mkdir(parents=True,exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
     process=subprocess.Popen([exe,"-b",str(data_dir)])
-    robot.sleep("16 seconds")
+    robot.sleep("13 seconds")
     activate_anki()
     title=focus_title()
-    if not title.strip(): raise AssertionError("NVDA did not announce an Anki window title")
-    note("precondition", folder_contents=[str(p.relative_to(data_dir)) for p in data_dir.rglob("*")][:50], window_title=title)
-    for i in range(8):
-        press("startup keyboard probe " + str(i), "tab", 0.4)
-        focus_description()
+    if not title.strip(): raise AssertionError("NVDA did not announce any Anki window title")
+    # The first launch displays a language picker. In the previous CI run,
+    # the keyboard cycled between 'English (United States)' and 'OK'.
+    # Complete this actual setup with keyboard, not with a programmatic bypass.
+    for i in range(7):
+        focus=focus_description()
+        if "OK" in focus and "button" in focus:
+            press("confirm first-run language", "enter", 2.5)
+            break
+        if any(x in focus.lower() for x in ["list item", "english", "language"]):
+            press("move to language confirmation", "tab", 0.5)
+        else:
+            press("find language confirmation", "tab", 0.5)
+    else:
+        note("first run dialog unidentified", title=focus_title())
+    robot.sleep("13 seconds")
+    note("post-language-setup", title=focus_title(),
+         focused=focus_description(),
+         folder_contents=[str(p.relative_to(data_dir)) for p in data_dir.rglob("*")][:40])
 
 def create_deck_via_keyboard():
     activate_anki()
