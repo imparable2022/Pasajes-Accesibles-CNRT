@@ -1,7 +1,7 @@
 name: Anki - real NVDA Windows keyboard audit
 on:
   push:
-    branches: [audit/anki-real-nvda-2026-11]
+    branches: [audit/anki-a11y-generalized-2026-11]
     paths:
       - "anki-a11y/**"
       - ".github/workflows/anki-real-nvda.yml"
@@ -73,7 +73,7 @@ jobs:
         shell: pwsh
         env:
           ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\a11y
-          ANKI_A11Y_ADDON_SOURCE: ${{ github.workspace }}\anki-a11y\experimental-review-announcer
+          ANKI_A11Y_ADDON_SOURCE: ${{ github.workspace }}\anki-a11y\anki-accessibility-prototype
         run: |
           New-Item -ItemType Directory -Force out/a11y | Out-Null
           Push-Location nvda
@@ -89,7 +89,7 @@ jobs:
           if (Test-Path out/a11y/speech.json) {
             $j = Get-Content out/a11y/speech.json -Raw | ConvertFrom-Json
             Write-Host "Speech records: $($j.records.Count)"
-            $j.records | Where-Object { $_.stage -match 'AUTOMATIC_NVDA|HOOK_STATUS|CONTENT_SPOKEN|CARD_READING_FAILURE|ACCESSIBILITY_FINDING|REVIEW_GRADED' } | ConvertTo-Json -Depth 6 | Write-Host
+            $j.records | Where-Object { $_.stage -match 'AUTOMATIC_NVDA|HOOK_STATUS|CONTENT_SPOKEN|CARD_READING_FAILURE|ACCESSIBILITY_FINDING|EDITOR_FRONT_LABEL|EDITOR_BACK_LABEL|REVIEW_GRADED' } | ConvertTo-Json -Depth 6 | Write-Host
           } else { Write-Host 'No speech trace produced' }
 
       - name: Upload speech evidence and logs
