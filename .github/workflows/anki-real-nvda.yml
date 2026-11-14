@@ -99,6 +99,7 @@ jobs:
           name: anki-real-nvda-evidence
           path: |
             out/a11y/speech.json
+            out/a11y/anki-startup.log
             out/a11y/output.xml
             out/a11y/log.html
             out/a11y/report.html
