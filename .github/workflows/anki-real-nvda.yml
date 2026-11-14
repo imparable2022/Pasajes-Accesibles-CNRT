@@ -12,11 +12,14 @@ permissions:
 
 jobs:
   anki-nvda:
-    name: NVDA review rich-focus=${{ matrix.rich_focus }}
+    name: NVDA rich=${{ matrix.rich_focus }} math=${{ matrix.math_variant }}
     strategy:
       fail-fast: false
       matrix:
-        rich_focus: [false, true]
+        include:
+          - { rich_focus: false, math_variant: native }
+          - { rich_focus: true, math_variant: native }
+          - { rich_focus: true, math_variant: detached }
     runs-on: windows-2025
     timeout-minutes: 55
     steps:
@@ -126,6 +129,7 @@ jobs:
           ANKI_A11Y_FIXTURE_SOURCE: ${{ github.workspace }}\anki-a11y\anki-fixture-loader
           ANKI_A11Y_CI: '1'
           ANKI_A11Y_RICH_FOCUS: ${{ matrix.rich_focus }}
+          ANKI_A11Y_MATH_VARIANT: ${{ matrix.math_variant }}
           ANKI_A11Y_FIXTURE_FILTER: Math,MathExponent,MathEquation,Image,Audio
           # Validate Return over audio links and capture MathCAT failures in saved NVDA logs.
         run: |
@@ -224,7 +228,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: anki-real-nvda-evidence-rich-${{ matrix.rich_focus }}
+          name: anki-real-nvda-evidence-rich-${{ matrix.rich_focus }}-${{ matrix.math_variant }}
           path: |
             out/a11y/speech.json
             out/a11y/semantic-audit.json
