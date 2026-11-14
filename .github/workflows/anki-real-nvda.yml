@@ -71,6 +71,7 @@ jobs:
         shell: pwsh
         env:
           ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\a11y
+          ANKI_A11Y_ADDON_SOURCE: ${{ github.workspace }}\anki-a11y\experimental-review-announcer
         run: |
           New-Item -ItemType Directory -Force out/a11y | Out-Null
           Push-Location nvda
