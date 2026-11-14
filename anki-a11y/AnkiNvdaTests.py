@@ -7,6 +7,7 @@ import ctypes
 import json
 import os
 import sqlite3
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -110,6 +111,10 @@ def start_anki():
     global process
     exe=os.environ["ANKI_EXE"]
     data_dir.mkdir(parents=True, exist_ok=True)
+    src = Path(os.environ["ANKI_A11Y_ADDON_SOURCE"])
+    target = data_dir / "addons21" / "anki_ci_review_announcer"
+    shutil.copytree(src, target, dirs_exist_ok=True)
+    note("TEST_ADDON_INSTALLED", path=str(target))
     process=subprocess.Popen([exe,"-b",str(data_dir)])
     robot.sleep("13 seconds")
     activate_anki()
@@ -142,6 +147,10 @@ def start_anki():
             continue
         break
     robot.sleep("12 seconds")
+    marker = data_dir / "addons21" / "anki_ci_review_announcer" / "loaded.marker"
+    if not marker.exists():
+        raise AssertionError("Experimental reviewer announcement add-on did not load")
+    note("TEST_ADDON_LOADED", marker=str(marker))
     note("post-language-setup", title=focus_title(),
          focused=focus_description(),
          folder_contents=[str(p.relative_to(data_dir)) for p in data_dir.rglob("*")][:40])
@@ -325,19 +334,32 @@ def study_with_keyboard():
     press("open selected deck", "enter", 1.3)
     note("deck opened", title=focus_title())
     select_button(["Study Now", "Estudiar ahora"], limit=18)
-    press("activate Study Now", "enter", 1.5)
+    spy = NvdaLib.getSpyLib()
+    idx = spy.get_next_speech_index()
+    transition = press("activate Study Now", "enter", 1.6)
+    robot.sleep("2 seconds")
+    question_auto = transition + "\\n" + spy.get_speech_at_index_until_now(idx)
+    question_auto_ok = FRONT.casefold() in question_auto.casefold()
+    note("QUESTION_AUTOMATIC_NVDA", spoken=question_auto[:1500], success=question_auto_ok)
     note("study screen", focused=focus_description())
 
     # Strict assertions: test only passes if NVDA genuinely voices each side.
     question_spoken = read_card_content_strict("QUESTION", FRONT)
     select_button(["Show Answer", "Mostrar respuesta"], limit=18)
-    press("show answer via keyboard", "enter", 1.3)
+    idx = spy.get_next_speech_index()
+    transition = press("show answer via keyboard", "enter", 1.4)
+    robot.sleep("2 seconds")
+    answer_auto = transition + "\\n" + spy.get_speech_at_index_until_now(idx)
+    answer_auto_ok = BACK.casefold() in answer_auto.casefold()
+    note("ANSWER_AUTOMATIC_NVDA", spoken=answer_auto[:1500], success=answer_auto_ok)
     answer_spoken = read_card_content_strict("ANSWER", BACK)
     select_button(["Good", "Bien"], limit=18)
     press("grade card with accessible button", "enter", 1.0)
     note("REVIEW_GRADED_AFTER_STRICT_NVDA_READING", question_spoken=question_spoken, answer_spoken=answer_spoken)
     if not question_spoken or not answer_spoken:
         raise AssertionError(f"NVDA text-reading strict criterion failed: question={question_spoken}, answer={answer_spoken}")
+    if not question_auto_ok or not answer_auto_ok:
+        raise AssertionError(f"Automatic NVDA announcement failed: question={question_auto_ok}, answer={answer_auto_ok}")
 
 def browser_via_keyboard():
     activate_anki()
