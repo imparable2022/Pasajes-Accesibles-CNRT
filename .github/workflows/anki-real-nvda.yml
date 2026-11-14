@@ -89,6 +89,7 @@ jobs:
           } finally { Pop-Location }
 
       - name: Verify ordinary keyboard navigation with no screen reader
+        if: always()
         shell: pwsh
         env:
           ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\a11y
