@@ -65,7 +65,7 @@ jobs:
         run: |
           Push-Location upstream-anki
           try {
-            git apply --check ../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch
+            git apply --cached --check ../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch
             if ($LASTEXITCODE -ne 0) { throw "Proposed upstream Svelte patch cannot apply" }
           } finally { Pop-Location }
 
@@ -122,7 +122,13 @@ jobs:
         shell: pwsh
         env:
           ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\a11y
-        run: python anki-a11y/AnkiNoAtKeyboard.py
+        run: |
+          if (-not $env:ANKI_EXE) {
+            Write-Host "Skipping no-reader check because Anki was never installed."
+          } else {
+            python anki-a11y/AnkiNoAtKeyboard.py
+            if ($LASTEXITCODE -ne 0) { throw "No-reader keyboard regression test failed" }
+          }
 
       - name: Evaluate actual screen-reader semantics for complex cards
         if: always()
