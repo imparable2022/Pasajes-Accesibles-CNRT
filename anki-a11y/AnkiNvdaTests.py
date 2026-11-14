@@ -130,7 +130,9 @@ def start_anki():
     settings = {"announce_review_cards": True, "announce_questions": True,
                 "announce_answers": True, "max_auto_speech_characters": 800,
                 "label_editor_fields": True,
-                "focus_noninteractive_rich_cards": rich_focus_enabled}
+                "focus_noninteractive_rich_cards": rich_focus_enabled,
+                "experimental_mathml_focus": rich_focus_enabled,
+                "enable_audio_replay_button": True}
     (target / "config.json").write_text(json.dumps(settings), encoding="utf-8")
     note("TEST_ADDON_INSTALLED", path=str(target), options=settings)
     logfile = out / "anki-startup.log"
@@ -578,10 +580,26 @@ def study_fixture_decks_via_keyboard():
             elif kind.startswith("Math"):
                 _check_math_semantics(kind, sample)
             elif kind == "Audio":
-                _semantic_check(kind, "audio_control_named_by_nvda",
-                                any(t in sample for t in ("play button", "replay", "play audio", "play sound", "pause button", "audio button", "sound button")),
-                                sample,
-                                "A readable audio control must be represented in NVDA speech")
+                # Separate voice exposure and activation from the existing R
+                # shortcut: a proper labeled button must be Tab-reachable.
+                select_button(["Replay audio (R)", "Replay audio"], limit=55)
+                button_focus = focus_description()
+                announce = "replay audio" in button_focus.casefold() and "button" in button_focus.casefold()
+                _semantic_check(kind, "audio_control_named_by_nvda", announce,
+                                button_focus,
+                                "NVDA must announce a labeled replay button")
+                events = data_dir / "addons21" / "anki_ci_fixtures" / "audio-events.json"
+                before_events = json.loads(events.read_text(encoding="utf-8")) if events.exists() else []
+                press("Activate replay button with Enter", "enter", 1.0)
+                robot.sleep(".8 seconds")
+                after_events = json.loads(events.read_text(encoding="utf-8")) if events.exists() else []
+                marker = data_dir / "addons21" / "anki_ci_review_announcer" / "replay-button-invoked.marker"
+                clicked = marker.exists() and any(
+                    ev.get("event") == "user_replay" for ev in after_events[len(before_events):]
+                )
+                _semantic_check(kind, "audio_replay_button_activated", clicked,
+                                after_events[len(before_events):],
+                                "Real accessible control must dispatch Anki's existing replay action")
                 _check_audio_replay(kind)
 
         if kind == "Typed":
@@ -598,6 +616,9 @@ def study_fixture_decks_via_keyboard():
             note("MULTIFORMAT_RENDERED_QUESTION", kind=kind,
                  aria=dom.get("aria"), active=dom.get("active"),
                  text_excerpt=(dom.get("text") or "")[:120])
+            if kind.startswith("Math"):
+                note("RENDERED_MATHML_DIAGNOSTICS",kind=kind,
+                     math=dom.get("math"),mathjax=dom.get("mathjax"))
             if kind in ("Image", "Math", "Audio", "Long", "Table", "Interactive"):
                 aria = dom.get("aria")
                 rich_enabled = os.environ.get("ANKI_A11Y_RICH_FOCUS", "false").lower() == "true"
