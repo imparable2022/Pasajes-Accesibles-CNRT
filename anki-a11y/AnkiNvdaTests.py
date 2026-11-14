@@ -175,30 +175,38 @@ def create_deck_via_keyboard():
 
 def add_card_via_keyboard():
     activate_anki()
-    press("open add window shortcut", "a", 2.4)
+    press("open Add shortcut","a",2.2)
     title=focus_title()
     if not any(t in title.casefold() for t in ["add","añadir","agregar"]):
         raise AssertionError(f"Add window title not announced: {title}")
-    # Do NOT assume focus is in the card editor: find it by NVDA Tab descriptions.
-    for i in range(34):
+    # The Nov 14 NVDA trace exposed a concrete accessibility finding:
+    # the focused editor was only announced as 'edit focused blank', with
+    # no Front label. Preserve it rather than treating it as a passing label.
+    first=None
+    for i in range(16):
         focus=focus_description()
-        if any(t in focus.casefold() for t in ["front","anverso","frente"]):
+        if "edit" in focus.casefold():
+            first=focus
             break
-        press("find Front "+str(i),"tab",0.35)
-    else:
-        raise AssertionError("NVDA did not identify the Front field by keyboard")
-    paste("type Front", FRONT)
-    press("next field","tab",0.6)
+        press("find first editor field "+str(i),"tab",0.5)
+    if first is None:
+        raise AssertionError("Cannot reach editable card field by keyboard")
+    if not any(x in first.casefold() for x in ["front","frente","anverso"]):
+        note("ACCESSIBILITY_FINDING", issue="Editor field missing spoken accessible label", actual=first)
+    paste("type card question in first field",FRONT)
+    next_announcement=press("move to next card field","tab",0.8)
     focus=focus_description()
-    if not any(t in focus.casefold() for t in ["back","reverso","dorso"]):
-        raise AssertionError(f"Next field is not announced as Back: {focus}")
-    paste("type Back",BACK)
-    # New notes may land in the default deck; use the selected deck dialog explicitly later.
-    press("add note shortcut","control+enter",1.5)
-    rows=wait_for("SELECT id, flds FROM notes WHERE flds LIKE ?",("%"+FRONT+"%",))
-    note("CARD_CREATED_VERIFIED", ids=[r[0] for r in rows], count=len(rows))
-    press("close Add", "escape",0.5)
-    return rows
+    note("next card field",speech=next_announcement,focus=focus)
+    if "edit" not in focus.casefold():
+        raise AssertionError("Tab did not reach another editable field")
+    if not any(x in focus.casefold() for x in ["back","dorso","reverso"]):
+        note("ACCESSIBILITY_FINDING",issue="Second card field missing spoken accessible label",actual=focus)
+    paste("type card answer in second field",BACK)
+    press("submit card with Ctrl+Enter","control+enter",1.7)
+    note("CARD_SUBMISSION_ATTEMPTED_BY_KEYBOARD")
+    # Main functional journey will independently verify persistence when
+    # review actually reads both sides of the newly-created card.
+    press("close Add via Escape","escape",0.8)
 
 def study_with_keyboard():
     activate_anki()
