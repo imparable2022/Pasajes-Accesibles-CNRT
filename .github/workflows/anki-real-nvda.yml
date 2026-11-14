@@ -46,6 +46,29 @@ jobs:
         shell: pwsh
         run: python anki-a11y/test_policy.py -v
 
+      - name: Fetch upstream Anki source for patch review
+        uses: actions/checkout@v4
+        with:
+          repository: ankitects/anki
+          ref: 827f4aa42681f1d60ab0fe4ad76eb75d767a385e
+          path: upstream-anki
+          sparse-checkout: |
+            ts/routes/editor/NoteEditor.svelte
+            ts/routes/editor/rich-text-input/RichTextInput.svelte
+            ts/routes/editor/plain-text-input/PlainTextInput.svelte
+            ts/routes/editor/CodeMirror.svelte
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Verify proposed editor patch applies to upstream source
+        shell: pwsh
+        run: |
+          Push-Location upstream-anki
+          try {
+            git apply --check ../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch
+            if ($LASTEXITCODE -ne 0) { throw "Proposed upstream Svelte patch cannot apply" }
+          } finally { Pop-Location }
+
       - name: Install verified official Anki
         shell: pwsh
         env:
@@ -101,6 +124,35 @@ jobs:
           ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\a11y
         run: python anki-a11y/AnkiNoAtKeyboard.py
 
+      - name: Evaluate actual screen-reader semantics for complex cards
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $file = "out/a11y/semantic-audit.json"
+          if (-not (Test-Path $file)) { throw "No real-NVDA semantic-audit.json produced" }
+          $data = Get-Content $file -Raw | ConvertFrom-Json
+          $failed = @($data.tests | Where-Object { -not $_.passed })
+          Write-Host "Semantic criteria checked: $(@($data.tests).Count). Unverified: $($failed.Count)"
+          $data.tests | ForEach-Object {
+            $outcome = if ($_.passed) { "PASS" } else { "UNVERIFIED" }
+            Write-Host "$outcome $($_.kind) : $($_.criterion)"
+          }
+          @(
+            "### Actual NVDA semantic checks (not DOM claims)"
+            ""
+            "| Type | Criterion | Result |"
+            "| --- | --- | --- |"
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $data.tests | ForEach-Object {
+            $outcome = if ($_.passed) { "PASS" } else { "UNVERIFIED" }
+            "| $($_.kind) | $($_.criterion) | $outcome |" |
+              Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          if ($failed.Count -gt 0) {
+            throw "Some semantic criteria are not proven by actual NVDA speech: $($failed.Count)"
+          }
+
       - name: Print NVDA speech trace for diagnosis
         if: always()
         shell: pwsh
@@ -119,6 +171,7 @@ jobs:
           name: anki-real-nvda-evidence-rich-${{ matrix.rich_focus }}
           path: |
             out/a11y/speech.json
+            out/a11y/semantic-audit.json
             out/a11y/anki-startup.log
             out/a11y/no-at-keyboard.json
             out/a11y/no-at-anki-startup.log
