@@ -423,6 +423,91 @@ def browser_via_keyboard():
     press("close Browser","escape",0.4)
     note("BROWSER_NAVIGATED",window_title=title)
 
+SEMANTIC_CHECKS = {}
+
+def _semantic_check(kind, criterion, passed, evidence, note_text=""):
+    key = kind + ":" + criterion
+    SEMANTIC_CHECKS[key] = {
+        "kind": kind,
+        "criterion": criterion,
+        "passed": bool(passed),
+        "evidence": str(evidence)[:3200],
+        "note": note_text,
+    }
+    (out / "semantic-audit.json").write_text(
+        json.dumps({"actual_nvda": True, "tests": list(SEMANTIC_CHECKS.values())},
+                   ensure_ascii=False, indent=2), encoding="utf-8")
+    note("SEMANTIC_AUDIT_CHECK", **SEMANTIC_CHECKS[key])
+
+def _speech_probe(kind):
+    """Read through ordinary NVDA gestures without inspecting HTML/ARIA.
+    Anki's UIA/DOM observation is recorded elsewhere, never used to satisfy
+    these checks. Preserves the full raw utterance evidence for failed cases.
+    """
+    samples = []
+    gestures = [
+        ("announce focused control", "NVDA+tab", .5),
+        ("switch browse/focus mode", "NVDA+space", .6),
+        ("start virtual document", "control+home", .6),
+        ("read first line", "downArrow", .65),
+        ("read next line", "downArrow", .65),
+        ("read current line", "NVDA+upArrow", .55),
+        ("read all", "NVDA+downArrow", 1.4),
+        ("graphic quick navigation", "g", .55),
+        ("announce graphic focus", "NVDA+tab", .55),
+        ("move navigator to focused object", "NVDA+numpadMinus", .5),
+        ("first navigation child", "NVDA+numpad2", .5),
+    ]
+    for step,gesture,delay in gestures:
+        try:
+            speech=press(f"{kind} semantics: {step}", gesture,delay)
+            samples.append({"gesture":gesture, "speech":speech})
+        except Exception as err:
+            samples.append({"gesture":gesture, "error":repr(err)})
+    # NVDA object navigation can expose a MathML/graphic node even if the
+    # QWebEngine virtual document does not expose a browse-mode cursor.
+    for idx in range(14):
+        for gesture in ("NVDA+numpad6", "NVDA+numpad2"):
+            try:
+                speech=press(f"{kind} semantics: object {idx} {gesture}",gesture,.30)
+                samples.append({"gesture":gesture,"speech":speech})
+            except Exception as err:
+                samples.append({"gesture":gesture,"error":repr(err)})
+                break
+    note("NVDA_SEMANTIC_SPEECH_PROBE",kind=kind,samples=samples[-24:])
+    return " ".join(s.get("speech", "") for s in samples).casefold()
+
+def _check_image_semantics(kind, speech):
+    expected="green square on white background"
+    _semantic_check(kind, "image_alt_spoken", expected in speech, speech,
+                    "Real NVDA must actually announce the image's alt text")
+
+def _check_math_semantics(kind, speech):
+    expected = {
+        "Math": ("fraction", "half", "quarter", "one over", "numerator", "denominator"),
+        "MathExponent": ("square", "squared", "cube", "cubed", "power", "superscript"),
+        "MathEquation": ("equal", "equals", "equation"),
+    }[kind]
+    found=any(x in speech for x in expected)
+    _semantic_check(kind,"mathematical_structure_spoken",found,speech,
+                    "A mathematical relation must be announced as speech, not merely present in DOM")
+
+def _check_audio_replay(kind):
+    fixture = data_dir / "addons21" / "anki_ci_fixtures" / "audio-events.json"
+    before = json.loads(fixture.read_text(encoding="utf-8")) if fixture.exists() else []
+    # Anki documents 'r' as a reviewer shortcut for replaying sound.
+    # This input is injected to the genuine Anki window, not a backend call.
+    press(f"{kind}: replay existing audio using keyboard", "r", .9)
+    robot.sleep("1 second")
+    after = json.loads(fixture.read_text(encoding="utf-8")) if fixture.exists() else []
+    new = after[len(before):]
+    requested = any(ev.get("event") == "user_replay" for ev in new)
+    queued = any(ev.get("event") == "play_request" for ev in new)
+    _semantic_check(kind,"audio_replay_keyboard_hook",requested,new,
+                    "Anki's audio_will_replay hook confirms the keyboard action")
+    _semantic_check(kind,"audio_playback_requested",queued,new,
+                    "Playback was requested, not proof of audible device output")
+
 def study_fixture_decks_via_keyboard():
     """Exercise actual Anki-generated media/complex cards and review controls.
 
@@ -462,6 +547,19 @@ def study_fixture_decks_via_keyboard():
         focus = focus_description()
         note("MULTIFORMAT_QUESTION", kind=kind,
              automatic_speech=spoken[:600], focused=focus[:600])
+        if kind in ("Image","Math","MathExponent","MathEquation","Audio"):
+            sample = _speech_probe(kind)
+            if kind == "Image":
+                _check_image_semantics(kind, sample)
+            elif kind.startswith("Math"):
+                _check_math_semantics(kind, sample)
+            elif kind == "Audio":
+                _semantic_check(kind, "audio_control_named_by_nvda",
+                                any(t in sample for t in ("play", "replay", "audio", "sound")),
+                                sample,
+                                "A readable audio control must be represented in NVDA speech")
+                _check_audio_replay(kind)
+
         if kind == "Typed":
             # Anki's native type-answer editor must retain focus.
             if not any(k in focus.casefold() for k in ["edit","text field","editable"]):
@@ -508,6 +606,11 @@ def study_fixture_decks_via_keyboard():
         press(f"{kind}: grade via keyboard", "enter", 0.9)
         note("MULTIFORMAT_REVIEW_COMPLETE", kind=kind)
     note("MULTIFORMAT_REVIEW_DONE", count=len(cases))
+    report = list(SEMANTIC_CHECKS.values())
+    note("REAL_NVDA_SEMANTIC_SUMMARY",tested=len(report),
+         passed=sum(x["passed"] for x in report),
+         unverified=[x["kind"]+":"+x["criterion"] for x in report if not x["passed"]])
+
 
 def stop_anki():
     save()
