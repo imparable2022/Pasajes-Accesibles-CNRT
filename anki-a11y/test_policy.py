@@ -289,7 +289,7 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         ]
         with tempfile.TemporaryDirectory() as temp:
             for index, source in enumerate(programs):
-                script = source.removeprefix("<script>").removesuffix("</script>")
+                script = source.strip().removeprefix("<script>").removesuffix("</script>").strip()
                 output = Path(temp) / f"check{index}.js"
                 output.write_text(script, encoding="utf-8")
                 check = subprocess.run(["node", "--check", str(output)],
