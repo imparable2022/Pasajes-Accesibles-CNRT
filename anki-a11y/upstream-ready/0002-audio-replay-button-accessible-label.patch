@@ -1,14 +1,14 @@
 diff --git a/qt/aqt/sound.py b/qt/aqt/sound.py
 --- a/qt/aqt/sound.py
 +++ b/qt/aqt/sound.py
-@@ -11,6 +11,7 @@
- import sys
- import time
- import traceback
-+from html import escape
- import wave
+@@ -15,6 +15,7 @@
  from abc import ABC, abstractmethod
  from collections.abc import Callable
+ from concurrent.futures import Future
++from html import escape
+ from operator import itemgetter
+ from pathlib import Path
+ from typing import Any, cast
 @@ -910,9 +911,10 @@
      """
  
