@@ -48,6 +48,16 @@ jobs:
           cp upstream-anki/rust-toolchain.toml rust-toolchain.toml
           ln -s upstream-anki/tools tools
 
+      - name: Install N2 directly from official Anki source
+        shell: bash
+        run: |
+          echo "Workspace $(pwd)"
+          ls -ld tools upstream-anki/tools upstream-anki/tools/install-n2
+          if ! command -v n2 >/dev/null 2>&1; then
+            bash upstream-anki/tools/install-n2
+          fi
+          command -v n2
+
       - name: Setup official Anki build environment
         uses: ./upstream-anki/.github/actions/setup-anki
 
