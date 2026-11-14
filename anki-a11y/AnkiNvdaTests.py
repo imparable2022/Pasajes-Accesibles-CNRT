@@ -115,7 +115,10 @@ def start_anki():
     activate_anki()
     title=focus_title()
     if not title.strip(): raise AssertionError("NVDA did not announce an Anki window title")
-    note("precondition", collection=str(db_path()))
+    note("precondition", folder_contents=[str(p.relative_to(data_dir)) for p in data_dir.rglob("*")][:50], window_title=title)
+    for i in range(8):
+        press("startup keyboard probe " + str(i), "tab", 0.4)
+        focus_description()
 
 def create_deck_via_keyboard():
     activate_anki()
