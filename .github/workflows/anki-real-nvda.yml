@@ -39,6 +39,8 @@ jobs:
 
       - name: Install verified official Anki
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: ./anki-a11y/get-anki.ps1 -Tag '26.09.4'
 
       - name: Fetch and verify NVDA installer
