@@ -546,7 +546,13 @@ def study_fixture_decks_via_keyboard():
     report = json.loads(fixture_file.read_text(encoding="utf-8"))
     cases = [item for item in report.get("cases", [])
              if item.get("status") in ("created", "already-present")]
-    if len(cases) < 6:
+    selected = [x.strip() for x in os.environ.get("ANKI_A11Y_FIXTURE_FILTER","").split(",") if x.strip()]
+    if selected:
+        cases = [x for x in cases if x["case"] in selected]
+        missing = sorted(set(selected) - {x["case"] for x in cases})
+        if missing:
+            raise AssertionError("Requested Anki fixtures were not generated: " + repr(missing))
+    elif len(cases) < 6:
         raise AssertionError("Insufficient actual Anki fixture cards: " + repr(cases))
     note("MULTIFORMAT_REVIEW_START", cases=[item["case"] for item in cases])
     for item in cases:
