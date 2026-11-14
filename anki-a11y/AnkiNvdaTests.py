@@ -122,9 +122,11 @@ def start_anki():
     shutil.copytree(fixture_src, fixture_target, dirs_exist_ok=True)
     note("FIXTURE_LOADER_INSTALLED", path=str(fixture_target))
     # Isolated test profile explicitly opts into automatic narration.
+    rich_focus_enabled = os.environ.get("ANKI_A11Y_RICH_FOCUS", "false").lower() == "true"
     settings = {"announce_review_cards": True, "announce_questions": True,
                 "announce_answers": True, "max_auto_speech_characters": 800,
-                "label_editor_fields": True}
+                "label_editor_fields": True,
+                "focus_noninteractive_rich_cards": rich_focus_enabled}
     (target / "config.json").write_text(json.dumps(settings), encoding="utf-8")
     note("TEST_ADDON_INSTALLED", path=str(target), options=settings)
     logfile = out / "anki-startup.log"
@@ -475,8 +477,20 @@ def study_fixture_decks_via_keyboard():
                  aria=dom.get("aria"), active=dom.get("active"),
                  text_excerpt=(dom.get("text") or "")[:120])
             if kind in ("Image", "Math", "Audio", "Long", "Table", "Interactive"):
-                if dom.get("aria"):
-                    raise AssertionError(f"{kind} was flattened into an ARIA name: {dom.get('aria')!r}")
+                aria = dom.get("aria")
+                rich_enabled = os.environ.get("ANKI_A11Y_RICH_FOCUS", "false").lower() == "true"
+                if rich_enabled and kind in ("Image", "Math", "Long", "Table"):
+                    # These noninteractive rich cards may be focused as an
+                    # explicitly labeled region but their content must remain
+                    # structurally navigable, not flattened into a huge name.
+                    if aria != "Question content":
+                        raise AssertionError(f"{kind} missing semantic focus region: {aria!r}")
+                    note("COMPLEX_CARD_REGION_FOCUSED",kind=kind,aria=aria,
+                         focused=focus[:320])
+                elif aria:
+                    # Audio controls and interactive buttons must remain
+                    # independent of the reviewer focus workaround.
+                    raise AssertionError(f"{kind} was flattened into an ARIA name: {aria!r}")
         select_button(["Show Answer","Mostrar respuesta"], limit=32)
         reveal_index = spy.get_next_speech_index()
         press(f"{kind}: reveal answer", "enter", 1.3)
