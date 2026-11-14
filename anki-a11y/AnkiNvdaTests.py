@@ -60,13 +60,16 @@ def focus_description():
 
 def select_button(targets, limit=80):
     """Tab until NVDA reports a requested button by its accessible name."""
+    recent = []
     for i in range(limit):
         speech = press("tab search " + str(i+1), "tab", 0.35)
         focus = focus_description()
+        recent.append(focus[:180])
         both = (speech + " " + focus).casefold()
         if any(t.casefold() in both for t in targets):
             note("button found", matching=targets, ordinal=i+1)
             return True
+    note("BUTTON_SEARCH_FAILED",targets=targets,limit=limit,last_focus=recent[-16:])
     raise AssertionError(f"Cannot reach button {targets} with Tab and NVDA in {limit} attempts")
 
 def db_path():
@@ -437,8 +440,16 @@ def study_fixture_decks_via_keyboard():
         kind = item["case"]
         deck = "NVDA Fixture - " + kind
         activate_anki()
+        press(f"{kind}: leave any editable review field", "escape", 0.4)
         press(f"{kind}: return to decks", "d", 0.8)
-        select_button([deck], limit=45)
+        try:
+            select_button([deck], limit=34)
+        except AssertionError:
+            note("FIXTURE_DECK_SEARCH_RECOVERY", kind=kind)
+            press(f"{kind}: escape focus or active editor", "escape", 0.8)
+            press(f"{kind}: reopen decks", "d", 1.0)
+            press(f"{kind}: restart keyboard scan from top", "control+home", 0.5)
+            select_button([deck], limit=65)
         press(f"{kind}: open deck", "enter", 0.7)
         select_button(["Study Now","Estudiar ahora"], limit=22)
         spy = NvdaLib.getSpyLib()
