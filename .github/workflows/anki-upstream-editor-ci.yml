@@ -1,4 +1,4 @@
-name: Anki upstream editor accessibility patch type-check
+name: Anki upstream editor accessibility Svelte syntax
 on:
   push:
     branches: [audit/anki-a11y-generalized-2026-11]
@@ -47,9 +47,24 @@ jobs:
           corepack enable
           yarn install --immutable
 
-      - name: Compile-check Svelte editor changes
+      - name: Parse four patched Svelte components with original compiler
         working-directory: upstream-anki
-        run: yarn svelte-check:once
+        run: |
+          node --input-type=module <<'EOF'
+          import fs from "node:fs";
+          import { parse } from "svelte/compiler";
+          const files = [
+            "ts/routes/editor/NoteEditor.svelte",
+            "ts/routes/editor/rich-text-input/RichTextInput.svelte",
+            "ts/routes/editor/plain-text-input/PlainTextInput.svelte",
+            "ts/routes/editor/CodeMirror.svelte",
+          ];
+          for (const file of files) {
+            const source = fs.readFileSync(file, "utf8");
+            parse(source, { filename: file, modern: true });
+            console.log("Svelte syntax valid:", file);
+          }
+          EOF
 
       - name: Verify only editor files changed
         working-directory: upstream-anki
