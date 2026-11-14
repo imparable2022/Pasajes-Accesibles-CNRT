@@ -130,7 +130,10 @@ REVIEW_JS = r"""
     } else {
         // Optional structural navigation: focus the region without flattening
         // images, mathematics, headings or long text into an aria-label.
-        qa.setAttribute("role", "region");
+        // Qt WebEngine/NVDA exposed "region" as an unknown role during the
+        // image experiment; the same named-group role used by Basic cards is
+        // announced correctly without hiding nested content.
+        qa.setAttribute("role", "group");
         qa.setAttribute("aria-label", side === "question" ?
             "Question content" : "Answer content");
     }
