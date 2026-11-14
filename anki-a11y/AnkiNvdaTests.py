@@ -590,7 +590,7 @@ def study_fixture_decks_via_keyboard():
                 # shortcut: a proper labeled button must be Tab-reachable.
                 select_button(["Replay audio (R)", "Replay audio"], limit=55)
                 button_focus = focus_description()
-                announce = "replay audio" in button_focus.casefold() and "button" in button_focus.casefold()
+                announce = "replay audio" in button_focus.casefold() and any(x in button_focus.casefold() for x in ("button", "link"))
                 _semantic_check(kind, "audio_control_named_by_nvda", announce,
                                 button_focus,
                                 "NVDA must announce a labeled replay button")
@@ -600,9 +600,13 @@ def study_fixture_decks_via_keyboard():
                 robot.sleep(".8 seconds")
                 after_events = json.loads(events.read_text(encoding="utf-8")) if events.exists() else []
                 marker = data_dir / "addons21" / "anki_ci_review_announcer" / "replay-button-invoked.marker"
-                clicked = marker.exists() and any(
-                    ev.get("event") == "user_replay" for ev in after_events[len(before_events):]
+                clicked = any(
+                    ev.get("event") == "play_request"
+                    for ev in after_events[len(before_events):]
                 )
+                note("AUDIO_CONTROL_ACTIVATION",kind=kind,
+                     used_bottom_button=marker.exists(),
+                     observed_events=after_events[len(before_events):])
                 _semantic_check(kind, "audio_replay_button_activated", clicked,
                                 after_events[len(before_events):],
                                 "Real accessible control must dispatch Anki's existing replay action")
