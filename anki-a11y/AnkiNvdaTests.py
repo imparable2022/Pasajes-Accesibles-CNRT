@@ -114,7 +114,12 @@ def start_anki():
     src = Path(os.environ["ANKI_A11Y_ADDON_SOURCE"])
     target = data_dir / "addons21" / "anki_ci_review_announcer"
     shutil.copytree(src, target, dirs_exist_ok=True)
-    note("TEST_ADDON_INSTALLED", path=str(target))
+    # Isolated test profile explicitly opts into automatic narration.
+    settings = {"announce_review_cards": True, "announce_questions": True,
+                "announce_answers": True, "max_auto_speech_characters": 800,
+                "label_editor_fields": True}
+    (target / "config.json").write_text(json.dumps(settings), encoding="utf-8")
+    note("TEST_ADDON_INSTALLED", path=str(target), options=settings)
     process=subprocess.Popen([exe,"-b",str(data_dir)])
     robot.sleep("13 seconds")
     activate_anki()
@@ -200,16 +205,18 @@ def add_card_via_keyboard():
         press("find first editor field "+str(i),"tab",0.5)
     if first is None:
         raise AssertionError("Cannot reach editable card field by keyboard")
-    if not any(x in first.casefold() for x in ["front","frente","anverso"]):
-        note("ACCESSIBILITY_FINDING", issue="Editor field missing spoken accessible label", actual=first)
+    front_labeled = any(x in first.casefold() for x in ["front","frente","anverso"])
+    note("EDITOR_FRONT_LABEL_VERIFIED", speech=first, success=front_labeled)
     paste("type card question in first field",FRONT)
     next_announcement=press("move to next card field","tab",0.8)
     focus=focus_description()
     note("next card field",speech=next_announcement,focus=focus)
     if "edit" not in focus.casefold():
         raise AssertionError("Tab did not reach another editable field")
-    if not any(x in focus.casefold() for x in ["back","dorso","reverso"]):
-        note("ACCESSIBILITY_FINDING",issue="Second card field missing spoken accessible label",actual=focus)
+    back_labeled = any(x in focus.casefold() for x in ["back","dorso","reverso"])
+    note("EDITOR_BACK_LABEL_VERIFIED", speech=focus, success=back_labeled)
+    if not (front_labeled and back_labeled):
+        raise AssertionError(f"Editor field labels were not announced: first={first!r}, second={focus!r}")
     paste("type card answer in second field",BACK)
     press("submit card with Ctrl+Enter","control+enter",1.7)
     note("CARD_SUBMISSION_ATTEMPTED_BY_KEYBOARD")
