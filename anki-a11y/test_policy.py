@@ -31,12 +31,14 @@ def load_addon(options=None):
     fake_qt = types.ModuleType("aqt.qt")
     fake_qt.QTimer = types.SimpleNamespace(singleShot=lambda ms, fn: None)
     previous = (sys.modules.get("aqt"), sys.modules.get("aqt.qt"))
+    package_before = {k:v for k,v in sys.modules.items() if k=="anki_ci_review_announcer" or k.startswith("anki_ci_review_announcer.")}
     oldenv = os.environ.pop("ANKI_A11Y_CI", None)
     try:
         sys.modules["aqt"] = fake_aqt
         sys.modules["aqt.qt"] = fake_qt
         spec = importlib.util.spec_from_file_location("anki_ci_review_announcer", ADDON_FILE)
         module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
         spec.loader.exec_module(module)
         return module, hooks
     finally:
@@ -45,6 +47,10 @@ def load_addon(options=None):
                 sys.modules.pop(k, None)
             else:
                 sys.modules[k] = prior
+        for k in list(sys.modules):
+            if k == "anki_ci_review_announcer" or k.startswith("anki_ci_review_announcer."):
+                del sys.modules[k]
+        sys.modules.update(package_before)
         if oldenv is not None:
             os.environ["ANKI_A11Y_CI"] = oldenv
 
