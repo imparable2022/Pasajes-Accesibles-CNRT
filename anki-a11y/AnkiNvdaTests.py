@@ -418,6 +418,64 @@ def browser_via_keyboard():
     press("close Browser","escape",0.4)
     note("BROWSER_NAVIGATED",window_title=title)
 
+def study_fixture_decks_via_keyboard():
+    """Exercise actual Anki-generated media/complex cards and review controls.
+
+    Fixture note creation uses Anki's collection API (setup only). Every
+    interaction with the rendered reviewer remains keyboard + real NVDA.
+    The test makes *no* claim that media/math content was understood unless
+    the actual speech trace supplies that evidence.
+    """
+    fixture_file = data_dir / "addons21" / "anki_ci_fixtures" / "fixtures.json"
+    report = json.loads(fixture_file.read_text(encoding="utf-8"))
+    cases = [item for item in report.get("cases", [])
+             if item.get("status") in ("created", "already-present")]
+    if len(cases) < 6:
+        raise AssertionError("Insufficient actual Anki fixture cards: " + repr(cases))
+    note("MULTIFORMAT_REVIEW_START", cases=[item["case"] for item in cases])
+    for item in cases:
+        kind = item["case"]
+        deck = "NVDA Fixture - " + kind
+        activate_anki()
+        press(f"{kind}: return to decks", "d", 0.8)
+        select_button([deck], limit=45)
+        press(f"{kind}: open deck", "enter", 0.7)
+        select_button(["Study Now","Estudiar ahora"], limit=22)
+        spy = NvdaLib.getSpyLib()
+        start_index = spy.get_next_speech_index()
+        press(f"{kind}: start study", "enter", 1.2)
+        robot.sleep("2 seconds")
+        spoken = spy.get_speech_at_index_until_now(start_index)
+        focus = focus_description()
+        note("MULTIFORMAT_QUESTION", kind=kind,
+             automatic_speech=spoken[:600], focused=focus[:600])
+        if kind == "Typed":
+            # Anki's native type-answer editor must retain focus.
+            if not any(k in focus.casefold() for k in ["edit","text field","editable"]):
+                note("MULTIFORMAT_FINDING", kind=kind,
+                     problem="Typed-answer input not focused", focused=focus)
+                raise AssertionError("Typing field unexpectedly lost focus")
+
+        addon = data_dir / "addons21" / "anki_ci_review_announcer"
+        domfile = addon / "reviewer-debug-question.json"
+        if domfile.exists():
+            dom = json.loads(domfile.read_text(encoding="utf-8"))
+            note("MULTIFORMAT_RENDERED_QUESTION", kind=kind,
+                 aria=dom.get("aria"), active=dom.get("active"),
+                 text_excerpt=(dom.get("text") or "")[:120])
+            if kind in ("Image", "Math", "Audio", "Long", "Table", "Interactive"):
+                if dom.get("aria"):
+                    raise AssertionError(f"{kind} was flattened into an ARIA name: {dom.get('aria')!r}")
+        select_button(["Show Answer","Mostrar respuesta"], limit=32)
+        press(f"{kind}: reveal answer", "enter", 1.3)
+        robot.sleep("1.2 seconds")
+        note("MULTIFORMAT_ANSWER", kind=kind,
+             focused=focus_description()[:600])
+        select_button(["Good","Bien"], limit=32)
+        press(f"{kind}: grade via keyboard", "enter", 0.9)
+        note("MULTIFORMAT_REVIEW_COMPLETE", kind=kind)
+    note("MULTIFORMAT_REVIEW_DONE", count=len(cases))
+
 def stop_anki():
     save()
     if process and process.poll() is None:
