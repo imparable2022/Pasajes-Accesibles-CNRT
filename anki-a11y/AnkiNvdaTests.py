@@ -478,10 +478,18 @@ def study_fixture_decks_via_keyboard():
                 if dom.get("aria"):
                     raise AssertionError(f"{kind} was flattened into an ARIA name: {dom.get('aria')!r}")
         select_button(["Show Answer","Mostrar respuesta"], limit=32)
+        reveal_index = spy.get_next_speech_index()
         press(f"{kind}: reveal answer", "enter", 1.3)
         robot.sleep("1.2 seconds")
-        note("MULTIFORMAT_ANSWER", kind=kind,
+        answer_utterance = spy.get_speech_at_index_until_now(reveal_index)
+        note("MULTIFORMAT_ANSWER", kind=kind, speech=answer_utterance[:800],
              focused=focus_description()[:600])
+        if kind == "Cloze":
+            recognized = "telescope" in answer_utterance.casefold()
+            note("CLOZE_REVEAL_NARRATED", success=recognized,
+                 actual=answer_utterance[:600])
+            if not recognized:
+                raise AssertionError("NVDA did not automatically announce the revealed cloze text")
         select_button(["Good","Bien"], limit=32)
         press(f"{kind}: grade via keyboard", "enter", 0.9)
         note("MULTIFORMAT_REVIEW_COMPLETE", kind=kind)
