@@ -6,6 +6,8 @@ The NVDA E2E suite runs separately. This test must not be described as
 Narrator/JAWS coverage or as exhaustive visual regression testing.
 """
 import json
+import ctypes
+from ctypes import wintypes
 import os
 import subprocess
 import time
@@ -83,6 +85,28 @@ def assert_no_reader():
             raise AssertionError(name + " is running in non-AT scenario")
     record("NO_SCREEN_READER_RUNNING")
 
+class GUIThreadInfo(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("hwndActive", wintypes.HWND),
+        ("hwndFocus", wintypes.HWND),
+        ("hwndCapture", wintypes.HWND),
+        ("hwndMenuOwner", wintypes.HWND),
+        ("hwndMoveSize", wintypes.HWND),
+        ("hwndCaret", wintypes.HWND),
+        ("rcCaret", wintypes.RECT),
+    ]
+
+def focused_window_handle(foreground):
+    thread_id = win32process.GetWindowThreadProcessId(foreground)[0]
+    info = GUIThreadInfo()
+    info.cbSize = ctypes.sizeof(info)
+    ok = ctypes.windll.user32.GetGUIThreadInfo(thread_id, ctypes.byref(info))
+    if not ok:
+        return 0
+    return int(info.hwndFocus or 0)
+
 def main():
     assert_no_reader()
     addon_config = PROFILE / "addons21" / "anki_ci_review_announcer" / "config.json"
@@ -117,7 +141,7 @@ def main():
             pyautogui.press("tab")
             time.sleep(.1)
             fg = win32gui.GetForegroundWindow()
-            focused = win32gui.GetGUIThreadInfo(win32process.GetWindowThreadProcessId(fg)[0]).get("hwndFocus")
+            focused = focused_window_handle(fg)
             seen.append({"focused_hwnd":int(focused or 0),
                          "window":win32gui.GetWindowText(fg)})
         record("TAB_NAVIGATION", sequence=seen)
