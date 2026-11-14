@@ -118,6 +118,7 @@ jobs:
           ANKI_A11Y_CI: '1'
           ANKI_A11Y_RICH_FOCUS: ${{ matrix.rich_focus }}
           ANKI_A11Y_FIXTURE_FILTER: Math,MathExponent,MathEquation,Image,Audio
+          # Validate Return over audio links and capture MathCAT failures in saved NVDA logs.
         run: |
           New-Item -ItemType Directory -Force out/a11y | Out-Null
           Push-Location nvda
