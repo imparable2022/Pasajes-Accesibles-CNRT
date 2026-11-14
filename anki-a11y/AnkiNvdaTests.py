@@ -66,7 +66,11 @@ def select_button(targets, limit=80):
         focus = focus_description()
         recent.append(focus[:180])
         both = (speech + " " + focus).casefold()
-        if any(t.casefold() in both for t in targets):
+        # NVDA inserts spaces into CamelCase names when speaking them.
+        # E.g. "MathExponent" is announced as "Math Exponent".
+        canonical = "".join(char for char in both if char.isalnum())
+        if any("".join(char for char in t.casefold() if char.isalnum())
+               in canonical for t in targets):
             note("button found", matching=targets, ordinal=i+1)
             return True
     note("BUTTON_SEARCH_FAILED",targets=targets,limit=limit,last_focus=recent[-16:])
