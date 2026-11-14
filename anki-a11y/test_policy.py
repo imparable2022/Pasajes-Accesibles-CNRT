@@ -192,7 +192,7 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         ])
         for name in ["image-focus","long-focus"]:
             self.assertEqual(data[name]["focusCount"], 1)
-            self.assertEqual(data[name]["attrs"]["role"], "region")
+            self.assertEqual(data[name]["attrs"]["role"], "group")
             self.assertEqual(data[name]["attrs"]["aria-label"], "Question content")
         self.assertEqual(data["typed-answer-still-safe"]["focusCount"], 0)
         self.assertEqual(data["math-still-safe"]["focusCount"], 0)
