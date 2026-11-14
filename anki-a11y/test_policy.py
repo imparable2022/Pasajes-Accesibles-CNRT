@@ -118,6 +118,101 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         self.assertTrue(output.startswith(html))
         self.assertIn("if (qa.querySelector(interactive.join", output)
 
+    def _run_dom_cases(self, cases):
+        harness = Path(__file__).parent / "review_dom_harness.js"
+        run = subprocess.run(["node", str(harness)], input=json.dumps({"cases": cases}),
+                             capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        return {row["name"]: row for row in json.loads(run.stdout)}
+
+    def test_real_javascript_question_answer_short_and_complex_content(self):
+        addon, hooks = load_addon({"announce_review_cards": True})
+        question = hooks.card_will_show[0]("", None, "reviewQuestion")
+        answer = hooks.card_will_show[0]("", None, "reviewAnswer")
+        cases = [
+            {"name":"plain-question", "source":question, "text":"Sample question"},
+            {"name":"plain-answer", "source":answer, "text":"Sample question\\nNew answer",
+             "previousQuestion":"Sample question", "answerMarker":True},
+            {"name":"answer-with-no-known-boundary", "source":answer,
+             "text":"Standalone answer", "previousQuestion":"", "answerMarker":False},
+            {"name":"long-question", "source":question, "text":"X"*900},
+            {"name":"typed-answer", "source":question,
+             "text":"Write the answer", "tags":["input"]},
+            {"name":"link", "source":question, "text":"Follow a link",
+             "tags":["a"]},
+            {"name":"interactive-button", "source":question, "text":"Button",
+             "tags":["button"]},
+            {"name":"prior-focused-complex-card", "source":answer,
+             "text":"Image on answer", "tags":["img"],"priorPatch":True,
+             "initialAttrs":{"role":"group","tabindex":"-1","aria-label":"Old question"}},
+        ]
+        rich_types = ["img", "svg", "math", "canvas", "iframe", "object",
+                      "audio", "video", "table", "ul", "ol", "pre", "code",
+                      "h1", "h2", "blockquote"]
+        for tag in rich_types:
+            cases.append({"name":"rich-"+tag, "source":question,
+                          "text":"Content with "+tag, "tags":[tag]})
+        data = self._run_dom_cases(cases)
+        for name, label in [
+            ("plain-question", "Sample question"),
+            ("plain-answer", "New answer"),
+        ]:
+            self.assertEqual(data[name]["focusCount"], 1, name)
+            self.assertEqual(data[name]["active"], "card", name)
+            self.assertEqual(data[name]["attrs"]["aria-label"], label, name)
+            self.assertEqual(data[name]["attrs"]["role"], "group", name)
+        self.assertEqual(data["plain-question"]["previousQuestion"], "Sample question")
+        for name in ["answer-with-no-known-boundary", "long-question",
+                     "typed-answer", "link", "interactive-button"]+[
+                     "rich-"+tag for tag in rich_types]:
+            with self.subTest(name=name):
+                self.assertEqual(data[name]["focusCount"], 0)
+                self.assertEqual(data[name]["active"], "unchanged")
+                self.assertNotIn("aria-label", data[name]["attrs"])
+        self.assertEqual(data["prior-focused-complex-card"]["focusCount"], 0)
+        self.assertEqual(data["prior-focused-complex-card"]["attrs"], {},
+                         "Stale question must not remain the accessible name of an image")
+
+    def test_optional_rich_region_is_not_flattened_into_aria_text(self):
+        addon, hooks = load_addon({
+            "announce_review_cards":True, "focus_noninteractive_rich_cards":True})
+        js = hooks.card_will_show[0]("", None, "reviewQuestion")
+        data = self._run_dom_cases([
+            {"name":"image-focus", "source":js, "tags":["img"], "text":"Description"},
+            {"name":"long-focus", "source":js, "text":"D"*1400},
+            {"name":"typed-answer-still-safe", "source":js, "tags":["input"],
+             "text":"Please type"},
+        ])
+        for name in ["image-focus","long-focus"]:
+            self.assertEqual(data[name]["focusCount"], 1)
+            self.assertEqual(data[name]["attrs"]["role"], "region")
+            self.assertEqual(data[name]["attrs"]["aria-label"], "Question content")
+        self.assertEqual(data["typed-answer-still-safe"]["focusCount"], 0)
+
+    def test_original_qa_semantics_are_restored(self):
+        addon, hooks = load_addon({"announce_review_cards":True})
+        answer = hooks.card_will_show[0]("", None, "reviewAnswer")
+        original = {"role":"region","aria-label":"Original reviewer label","tabindex":"1"}
+        data = self._run_dom_cases([{
+            "name":"original-semantic-attributes", "source":answer,
+            "text":"Image", "tags":["img"], "priorPatch":True,
+            "initialAttrs":{"role":"group","aria-label":"Old question","tabindex":"-1"},
+            "savedAttrs":original,
+        }])["original-semantic-attributes"]
+        self.assertEqual(data["attrs"], original)
+
+    def test_editor_label_reacts_to_custom_field_names_without_moving_focus(self):
+        addon, hooks = load_addon({"label_editor_fields":True})
+        data = self._run_dom_cases([{
+            "name":"renamed-field",
+            "editorScript":addon.EDITOR_JS,
+            "fieldName":"Front",
+            "updatedFieldName":"Mi pregunta",
+        }])["renamed-field"]
+        self.assertEqual(data["initial"], {"rich":"Front","plain":"Front"})
+        self.assertEqual(data["updated"], {"rich":"Mi pregunta","plain":"Mi pregunta"})
+        self.assertGreaterEqual(data["observerCount"], 2)
+
     def test_javascript_is_valid(self):
         addon, hooks = load_addon({"announce_review_cards": True})
         programs = [
