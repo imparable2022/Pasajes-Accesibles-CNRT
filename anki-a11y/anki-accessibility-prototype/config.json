@@ -3,5 +3,6 @@
   "announce_questions": true,
   "announce_answers": true,
   "max_auto_speech_characters": 800,
-  "label_editor_fields": true
+  "label_editor_fields": true,
+  "focus_noninteractive_rich_cards": false
 }
