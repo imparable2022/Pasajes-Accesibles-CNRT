@@ -57,5 +57,11 @@ def verify_mathcat_in_chrome():
         records.append({"kind":kind,"entry":entry,"mathcat_usable":mathcat,"utterances":utterances})
         output.write_text(json.dumps(records,ensure_ascii=False,indent=2),encoding="utf-8")
         robot.log(f"Chrome MathCAT {kind}: {records[-1]}")
-    if not any(x["mathcat_usable"] for x in records):
-        raise AssertionError("Even direct Chrome MathML was not recognized as MathCAT in this control; see logs")
+    failures = [x["kind"] for x in records if not x["mathcat_usable"]]
+    # Every required structure must be explored. One working equation must
+    # not mask a failing fraction or exponent in the browser control.
+    if failures:
+        raise AssertionError(
+            "Chrome MathCAT failed structured arrow navigation for: "
+            + ", ".join(failures) + "; see chrome-mathcat-control.json"
+        )
