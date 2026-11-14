@@ -285,15 +285,34 @@ def read_card_content_strict(stage, expected):
                 return True
         except Exception as error:
             note("object navigation unavailable", gesture=gesture,error=repr(error))
-    for i in range(18):
-        try:
-            if capture("next accessibility object "+str(i),"NVDA+numpad6",0.4):
+    # The first child of Anki's outer grouping is the top toolbar. Move to
+    # its *next sibling* (the main webview) and then enter the main webview's
+    # children. This differs from mistakenly enumerating only the root level.
+    try:
+        if capture("move to main webview sibling", "NVDA+numpad6", 0.7):
+            note(f"{stage}_CONTENT_SPOKEN_BY_NVDA",expected=expected,source="object_navigation")
+            return True
+        for depth in range(1,5):
+            if capture("enter main webview child depth "+str(depth),"NVDA+numpad2",0.6):
                 note(f"{stage}_CONTENT_SPOKEN_BY_NVDA",expected=expected,
-                     gesture="NVDA+numpad6",source="object_navigation")
+                     gesture="NVDA+numpad2",source="object_navigation")
                 return True
-        except Exception as error:
-            note("object navigation stopped",error=repr(error))
-            break
+            for idx in range(8):
+                spoken=press(f"{stage}: explore sibling depth {depth} index {idx}","NVDA+numpad6",0.38)
+                observations.append((f"object sibling depth {depth} index {idx}",spoken))
+                if expected.casefold() in spoken.casefold():
+                    note(f"{stage}_CONTENT_SPOKEN_BY_NVDA",expected=expected,
+                         gesture="NVDA+numpad6",source="object_navigation")
+                    return True
+                if "no next" in spoken.casefold(): break
+            # Return to first child at current depth, to drill into descendants
+            # of the main webview instead of moving to sibling toolbars.
+            for i in range(8):
+                back=press(f"{stage}: rewind object sibling {i}","NVDA+numpad4",0.22)
+                observations.append(("object rewind",back))
+                if "no previous" in back.casefold():break
+    except Exception as error:
+        note("object navigation traversal error",error=repr(error))
 
     note("NVDA_CARD_READING_FAILURE", phase=stage, expected=expected, mode=mode,
          samples=[{"gesture":k,"speech":v[:500]} for k,v in observations])
