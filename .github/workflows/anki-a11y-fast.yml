@@ -1,4 +1,4 @@
-name: Anki accessibility prototypes - fast regression
+name: Anki accessibility prototypes - MathCAT/audio fast regression
 on:
   push:
     branches: [audit/anki-a11y-generalized-2026-11]
