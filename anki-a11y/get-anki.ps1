@@ -1,6 +1,8 @@
 param([string]$Tag = '26.09.4')
 $ErrorActionPreference = 'Stop'
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/ankitects/anki/releases/tags/$Tag" -Headers @{'User-Agent'='anki-a11y-ci'}
+$headers = @{'User-Agent'='anki-a11y-ci'}
+if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
+$release = Invoke-RestMethod -Uri "https://api.github.com/repos/ankitects/anki/releases/tags/$Tag" -Headers $headers
 $assets = @($release.assets | Where-Object { $_.name -match 'win-x64\.msi$' })
 if ($assets.Count -ne 1) {
   $release.assets | ForEach-Object { Write-Host $_.name }
