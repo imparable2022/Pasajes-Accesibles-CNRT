@@ -479,7 +479,7 @@ def study_fixture_decks_via_keyboard():
             if kind in ("Image", "Math", "Audio", "Long", "Table", "Interactive"):
                 aria = dom.get("aria")
                 rich_enabled = os.environ.get("ANKI_A11Y_RICH_FOCUS", "false").lower() == "true"
-                if rich_enabled and kind in ("Image", "Math", "Long", "Table"):
+                if rich_enabled and kind in ("Image", "Long", "Table"):
                     # These noninteractive rich cards may be focused as an
                     # explicitly labeled region but their content must remain
                     # structurally navigable, not flattened into a huge name.
