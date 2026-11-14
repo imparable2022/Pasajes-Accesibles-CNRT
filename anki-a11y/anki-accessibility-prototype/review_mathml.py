@@ -4,6 +4,7 @@ This intentionally does NOT flatten a formula into a text/ARIA label.
 If MathJax has already emitted assistive MathML we reuse that node;
 otherwise we request MathML from MathJax's own parsed expression tree.
 """
+import json
 from . import HERE, OPTIONS, CI_MODE, gui_hooks
 
 MATH_FOCUS_JS = r"""
@@ -49,6 +50,19 @@ MATH_FOCUS_JS = r"""
     }
     if (!math) continue;
     if (math.localName !== "math") continue;
+    // Controlled Qt WebEngine experiment: clone the unmodified MathML
+    // outside MathJax's assistive wrapper, keeping its native structure.
+    if (__DETACHED__) {
+      const clone = math.cloneNode(true);
+      const host = document.createElement("span");
+      host.className = "anki-a11y-mathml-isolation-test";
+      host.style.cssText = "position:absolute;width:1px;height:1px;" +
+        "overflow:hidden;clip-path:inset(50%);white-space:nowrap;";
+      host.appendChild(clone);
+      visual.after(host);
+      math = clone;
+      report.injectedMath++;
+    }
     // Qt WebEngine exposes the native MathML as role "unknown" to NVDA.
     // Try an explicit ARIA math role without linearizing or duplicating
     // the equation. This is a controlled experiment, not an upstream fix.
@@ -74,7 +88,8 @@ def add_math_navigation(html, card, context):
     if not OPTIONS.get("experimental_mathml_focus", False):
         return html
     # Append after the normal reviewer body (and its existing hooks).
-    return html + "<script>onShownHook.push(() => {\n" + MATH_FOCUS_JS + "\n});</script>"
+    code = MATH_FOCUS_JS.replace("__DETACHED__", json.dumps(bool(OPTIONS.get("experimental_mathml_detached", False))))
+    return html + "<script>onShownHook.push(() => {\n" + code + "\n});</script>"
 
 def register_math_hooks():
     gui_hooks.card_will_show.append(add_math_navigation)
