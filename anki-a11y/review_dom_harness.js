@@ -35,6 +35,12 @@ function runReviewer(test) {
         hasAttribute(name) {return Object.hasOwn(attrs, name);},
         setAttribute(name, value) {attrs[name] = String(value);},
         removeAttribute(name) {delete attrs[name];},
+        querySelectorAll(selector) {
+            if (selector === ".cloze") {
+                return (test.clozeItems || []).map(item => ({innerText: item}));
+            }
+            return [];
+        },
         querySelector(selector) {
             if (selector === "#answer") return test.answerMarker ? {} : null;
             const tags = test.tags || [];
