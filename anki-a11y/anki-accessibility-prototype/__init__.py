@@ -26,6 +26,8 @@ DEFAULTS = {
     "announce_answers": True,
     "max_auto_speech_characters": 800,
     "label_editor_fields": True,
+    "experimental_mathml_focus": False,
+    "enable_audio_replay_button": False,
     "focus_noninteractive_rich_cards": False,
 }
 try:
@@ -40,5 +42,10 @@ OPTIONS["max_auto_speech_characters"] = max(40, min(3000, int(OPTIONS["max_auto_
 from .reviewer_focus import REVIEW_JS, _card_hook, register_reviewer_hooks
 from .editor_labels import EDITOR_JS, _editor_note_loaded, register_editor_hooks
 
+from .review_mathml import register_math_hooks
+from .review_audio import register_audio_hooks
+
 register_reviewer_hooks()
 register_editor_hooks()
+register_math_hooks()
+register_audio_hooks()
