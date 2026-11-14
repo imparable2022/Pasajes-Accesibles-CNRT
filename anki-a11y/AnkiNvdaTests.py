@@ -490,7 +490,7 @@ def _check_math_semantics(kind, speech):
     expected = {
         "Math": ("fraction", "half", "quarter", "one over", "numerator", "denominator"),
         "MathExponent": ("square", "squared", "cube", "cubed", "power", "superscript"),
-        "MathEquation": ("equal", "equals", "equation"),
+        "MathEquation": ("equal", "equals", "is equal to"),
     }[kind]
     found=any(x in speech for x in expected)
     _semantic_check(kind,"mathematical_structure_spoken",found,speech,
@@ -559,7 +559,7 @@ def study_fixture_decks_via_keyboard():
                 _check_math_semantics(kind, sample)
             elif kind == "Audio":
                 _semantic_check(kind, "audio_control_named_by_nvda",
-                                any(t in sample for t in ("play", "replay", "audio", "sound")),
+                                any(t in sample for t in ("play button", "replay", "play audio", "play sound", "pause button", "audio button", "sound button")),
                                 sample,
                                 "A readable audio control must be represented in NVDA speech")
                 _check_audio_replay(kind)
