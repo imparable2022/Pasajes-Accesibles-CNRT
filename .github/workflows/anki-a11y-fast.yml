@@ -27,6 +27,6 @@ jobs:
       - name: Python syntax for all independent modules and tests
         run: |
           python -m compileall -q anki-a11y/anki-accessibility-prototype
-          python -m py_compile anki-a11y/AnkiNvdaTests.py anki-a11y/test_policy.py
+          python -m py_compile anki-a11y/AnkiNvdaTests.py anki-a11y/MathCATChromeControl.py anki-a11y/anki-fixture-loader/__init__.py anki-a11y/test_policy.py
       - name: Execute standalone JS DOM and Python policy regressions
         run: python anki-a11y/test_policy.py -v
