@@ -187,12 +187,15 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
             {"name":"long-focus", "source":js, "text":"D"*1400},
             {"name":"typed-answer-still-safe", "source":js, "tags":["input"],
              "text":"Please type"},
+            {"name":"math-still-safe", "source":js, "tags":["svg"],
+             "text":"Equation fractions"},
         ])
         for name in ["image-focus","long-focus"]:
             self.assertEqual(data[name]["focusCount"], 1)
             self.assertEqual(data[name]["attrs"]["role"], "region")
             self.assertEqual(data[name]["attrs"]["aria-label"], "Question content")
         self.assertEqual(data["typed-answer-still-safe"]["focusCount"], 0)
+        self.assertEqual(data["math-still-safe"]["focusCount"], 0)
 
     def test_original_qa_semantics_are_restored(self):
         addon, hooks = load_addon({"announce_review_cards":True})
