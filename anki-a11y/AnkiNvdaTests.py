@@ -478,7 +478,27 @@ def _speech_probe(kind):
             except Exception as err:
                 samples.append({"gesture":gesture,"error":repr(err)})
                 break
-    note("NVDA_SEMANTIC_SPEECH_PROBE",kind=kind,samples=samples[-24:])
+    if kind.startswith("Math"):
+        # MathCAT is the NVDA 2026 mathematical interaction engine.
+        # This is a user gesture, not a DOM/MathML read from Python.
+        for step, gesture in [
+            ("focus current object", "NVDA+numpadMinus"),
+            ("enter document", "NVDA+numpad2"),
+            ("move to mathematical child", "NVDA+numpad6"),
+            ("descend into equation", "NVDA+numpad2"),
+            ("MathCAT: interact", "NVDA+alt+m"),
+            ("MathCAT: read current", "space"),
+            ("MathCAT: zoom in", "downArrow"),
+            ("MathCAT: move right", "rightArrow"),
+            ("MathCAT: read fraction/exponent piece", "space"),
+            ("MathCAT: exit", "escape"),
+        ]:
+            try:
+                spoken=press(f"{kind} {step}",gesture,.6)
+                samples.append({"gesture":gesture,"speech":spoken})
+            except Exception as err:
+                samples.append({"gesture":gesture,"error":repr(err)})
+    note("NVDA_SEMANTIC_SPEECH_PROBE",kind=kind,samples=samples[-40:])
     return " ".join(s.get("speech", "") for s in samples).casefold()
 
 def _check_image_semantics(kind, speech):
