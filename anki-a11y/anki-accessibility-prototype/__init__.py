@@ -78,8 +78,17 @@ REVIEW_JS = r"""
         window.__ankiA11yPreviousQuestion = visible;
     } else {
         const question = normalize(window.__ankiA11yPreviousQuestion);
-        // Only remove an exact visible prefix from the answer side.
-        if (question && visible.startsWith(question)) {
+        // For cloze deletions the answer changes text *within* the question.
+        // Anki renders revealed deletions in .cloze elements, so recognize
+        // those explicitly instead of incorrectly expecting an unchanged
+        // question prefix. Preserve surrounding HTML for further navigation.
+        const clozes = Array.from(qa.querySelectorAll(".cloze"));
+        if (clozes.length && (!question || !visible.startsWith(question))) {
+            text = normalize(clozes.map(el => el.innerText).join(" "));
+            if (text === "[...]" || text === "...") text = "";
+        }
+        // Basic cards preserve the question and add an answer beneath it.
+        if (!text && question && visible.startsWith(question)) {
             text = normalize(visible.slice(question.length));
         }
         if (!text && qa.querySelector("#answer")) {
