@@ -65,7 +65,13 @@ jobs:
         run: |
           Push-Location upstream-anki
           try {
-            git apply --cached --check ../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch
+            # Windows checkout may convert .patch to CRLF, which makes Git
+            # reject every hunk against the repository's LF blob objects.
+            $original = Get-Content "../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch" -Raw
+            $normalized = $original.Replace("`r`n", "`n")
+            $patchFile = Join-Path $env:RUNNER_TEMP 'anki-editor-upstream-lf.patch'
+            [System.IO.File]::WriteAllText($patchFile, $normalized, [System.Text.UTF8Encoding]::new($false))
+            git apply --cached --check $patchFile
             if ($LASTEXITCODE -ne 0) { throw "Proposed upstream Svelte patch cannot apply" }
           } finally { Pop-Location }
 
