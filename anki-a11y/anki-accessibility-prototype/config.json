@@ -4,5 +4,7 @@
   "announce_answers": true,
   "max_auto_speech_characters": 800,
   "label_editor_fields": true,
-  "focus_noninteractive_rich_cards": false
+  "focus_noninteractive_rich_cards": false,
+  "experimental_mathml_focus": false,
+  "enable_audio_replay_button": false
 }
