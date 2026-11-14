@@ -377,6 +377,10 @@ def study_with_keyboard():
     transition = press("show answer via keyboard", "enter", 1.4)
     robot.sleep("2 seconds")
     answer_auto = spy.get_speech_at_index_until_now(idx)
+    for side in ("question", "answer"):
+        report = data_dir / "addons21" / "anki_ci_review_announcer" / ("reviewer-debug-" + side + ".json")
+        note("REVIEWER_DOM_STATE", side=side,
+             data=report.read_text(encoding="utf-8") if report.exists() else "(not captured)")
     answer_auto_ok = BACK.casefold() in answer_auto.casefold()
     note("ANSWER_AUTOMATIC_NVDA", spoken=answer_auto[:1500], success=answer_auto_ok)
     answer_spoken = read_card_content_strict("ANSWER", BACK)
