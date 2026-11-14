@@ -1,0 +1,32 @@
+name: Anki accessibility prototypes - fast regression
+on:
+  push:
+    branches: [audit/anki-a11y-generalized-2026-11]
+    paths:
+      - "anki-a11y/**"
+      - ".github/workflows/anki-a11y-fast.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Python syntax for all independent modules and tests
+        run: |
+          python -m compileall -q anki-a11y/anki-accessibility-prototype
+          python -m py_compile anki-a11y/AnkiNvdaTests.py anki-a11y/test_policy.py
+      - name: Execute standalone JS DOM and Python policy regressions
+        run: python anki-a11y/test_policy.py -v
