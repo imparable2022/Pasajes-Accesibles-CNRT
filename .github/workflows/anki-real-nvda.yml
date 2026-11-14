@@ -39,7 +39,7 @@ jobs:
 
       - name: Validate policy defaults, editor instrumentation and JS syntax
         shell: pwsh
-        run: python -m unittest discover -s anki-a11y -p test_policy.py -v
+        run: python anki-a11y/test_policy.py -v
 
       - name: Install verified official Anki
         shell: pwsh
