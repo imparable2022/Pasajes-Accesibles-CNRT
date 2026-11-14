@@ -1,4 +1,4 @@
-name: Anki upstream editor accessibility - full source build
+name: Anki upstream accessibility patches - full source build
 on:
   push:
     branches: [audit/anki-a11y-generalized-2026-11]
@@ -34,9 +34,12 @@ jobs:
         run: |
           git apply --check ../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch
           git apply ../anki-a11y/upstream-ready/0001-editor-fields-accessible-names.patch
+          git apply --check ../anki-a11y/upstream-ready/0002-audio-replay-button-accessible-label.patch
+          git apply ../anki-a11y/upstream-ready/0002-audio-replay-button-accessible-label.patch
           git diff --check
           git diff --stat
-          test "$(git diff --name-only | wc -l)" -eq 4
+          test "$(git diff --name-only | wc -l)" -eq 5
+          python ../anki-a11y/upstream-ready/test_audio_patch.py
 
       - name: Make upstream setup paths available at GitHub workspace root
         shell: bash
