@@ -37,12 +37,14 @@ _HEAD = r"""
 
 def on_webview_content(web_content, context):
     if isinstance(context, Reviewer):
+        Path(__file__).with_name("webview-hook.marker").write_text("reviewer webview instrumented", encoding="utf-8")
         web_content.head += _HEAD
 
 def prepare_card(html, card, context):
     if context not in ("reviewQuestion", "reviewAnswer"):
         return html
     side = "question" if context == "reviewQuestion" else "answer"
+    Path(__file__).with_name("card-hook.marker").write_text(side, encoding="utf-8")
     return html + f"""
 <script>
 onShownHook.push(() => {{
@@ -51,6 +53,12 @@ onShownHook.push(() => {{
     if (!content || !live) return;
     const text = content.innerText.trim();
     if (!text) return;
+    // Focus rendered content as a named accessibility node. This is an
+    // experimental workaround, not a recommended upstream change.
+    content.tabIndex = -1;
+    content.setAttribute('role', 'group');
+    content.setAttribute('aria-label', text.slice(0, 1000));
+    content.focus({ preventScroll: true });
     // A cleared, stable region avoids relying on focus moving to the text.
     live.textContent = '';
     setTimeout(() => {{
