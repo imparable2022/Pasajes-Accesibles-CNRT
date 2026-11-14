@@ -1,0 +1,100 @@
+# Proposed upstream patch: editor field accessible names
+# Based on upstream ankitects/anki main as inspected 2026-11-14.
+# Adds accessible names to actual rich-text and CodeMirror focus targets.
+diff --git a/ts/routes/editor/NoteEditor.svelte b/ts/routes/editor/NoteEditor.svelte
+--- a/ts/routes/editor/NoteEditor.svelte
++++ b/ts/routes/editor/NoteEditor.svelte
+@@ -1588,6 +1588,7 @@
+                         >
+                             <RichTextInput
+                                 {hidden}
++                                accessibleName={field.name}
+                                 on:focusout={() => {
+                                     saveFieldNow();
+                                     $focusedInput = null;
+@@ -1605,6 +1606,7 @@
+                         >
+                             <PlainTextInput
+                                 {hidden}
++                                accessibleName={field.name}
+                                 fieldCollapsed={fieldsCollapsed[index]}
+                                 on:focusout={() => {
+                                     saveFieldNow();
+diff --git a/ts/routes/editor/rich-text-input/RichTextInput.svelte b/ts/routes/editor/rich-text-input/RichTextInput.svelte
+--- a/ts/routes/editor/rich-text-input/RichTextInput.svelte
++++ b/ts/routes/editor/rich-text-input/RichTextInput.svelte
+@@ -84,6 +84,7 @@
+     import { fragmentToStored, storedToFragment } from "./transform";
+ 
+     export let hidden = false;
++    export let accessibleName = "";
+     export const focusFlag = new Flag();
+     export let isClozeField: boolean;
+ 
+@@ -96,6 +97,17 @@
+ 
+     const nodes = getNormalizingNodeStore();
+     const [richTextPromise, resolve] = useRichTextResolve(isLegacy);
++
++    // The actual focusable field is <anki-editable> in the shadow tree.
++    // Apply the current field name on creation and after note-type changes.
++    $: {
++        const name = accessibleName;
++        void richTextPromise.then((editable) => {
++            if (editable.getAttribute("aria-label") !== name) {
++                editable.setAttribute("aria-label", name);
++            }
++        });
++    }
+     const { mirror, preventResubscription } = useDOMMirror();
+     const [inputHandler, setupInputHandler] = useInputHandler();
+     const [customStyles, stylesResolve] = promiseWithResolver<Record<string, any>>();
+diff --git a/ts/routes/editor/plain-text-input/PlainTextInput.svelte b/ts/routes/editor/plain-text-input/PlainTextInput.svelte
+--- a/ts/routes/editor/plain-text-input/PlainTextInput.svelte
++++ b/ts/routes/editor/plain-text-input/PlainTextInput.svelte
+@@ -51,6 +51,7 @@
+     import { storedToUndecorated, undecoratedToStored } from "./transform";
+ 
+     export let hidden = false;
++    export let accessibleName = "";
+     export let fieldCollapsed = false;
+     export const focusFlag = new Flag();
+ 
+@@ -166,6 +167,7 @@
+     {hidden}
+ >
+     <CodeMirror
++        {accessibleName}
+         {configuration}
+         {code}
+         {hidden}
+diff --git a/ts/routes/editor/CodeMirror.svelte b/ts/routes/editor/CodeMirror.svelte
+--- a/ts/routes/editor/CodeMirror.svelte
++++ b/ts/routes/editor/CodeMirror.svelte
+@@ -30,6 +30,7 @@
+     } from "./code-mirror";
+ 
+     export let configuration: CodeMirrorLib.EditorConfiguration;
++    export let accessibleName = "";
+     export let code: Writable<string>;
+     export let hidden = false;
+ 
+@@ -40,6 +41,18 @@
+ 
+     const [editorPromise, resolve] = promiseWithResolver<CodeMirrorLib.Editor>();
+ 
++    // CodeMirror replaces the hidden source textarea with its own input.
++    // Label the real focusable element and keep it in sync after renames.
++    $: {
++        const name = accessibleName;
++        void editorPromise.then((editor) => {
++            const input = editor.getInputField();
++            if (input.getAttribute("aria-label") !== name) {
++                input.setAttribute("aria-label", name);
++            }
++        });
++    }
++
+     /**
+      * Convenience function for editor.setOption.
+      */
