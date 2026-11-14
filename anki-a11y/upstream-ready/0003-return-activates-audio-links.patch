@@ -1,0 +1,47 @@
+diff --git a/qt/aqt/reviewer.py b/qt/aqt/reviewer.py
+--- a/qt/aqt/reviewer.py
++++ b/qt/aqt/reviewer.py
+@@ -609,8 +609,8 @@
+         return [
+             ("e", self.mw.onEditCurrent),
+             (" ", self.onEnterKey),
+-            (Qt.Key.Key_Return, self.onEnterKey),
+-            (Qt.Key.Key_Enter, self.onEnterKey),
++            (Qt.Key.Key_Return, self._on_return_key),
++            (Qt.Key.Key_Enter, self._on_return_key),
+             ("m", self.showContextMenu),
+             ("r", self.replayAudio),
+             (Qt.Key.Key_F5, self.replayAudio),
+@@ -655,6 +655,32 @@
+         av_player.seek_relative(self.seek_secs)
+         gui_hooks.audio_did_seek_relative(self.web, self.seek_secs)
+ 
++    def _on_return_key(self) -> None:
++        """Keep Return/Enter usable on audio replay links without changing R/F5.
++
++        Anki registers Return as a study shortcut; Qt can intercept it before
++        a focused link's native click handler. Space still shows the answer.
++        """
++        if not self.card or not (
++            self.card.question_av_tags() or self.card.answer_av_tags()
++        ):
++            self.onEnterKey()
++            return
++
++        js = (
++            "(() => document.hasFocus() "
++            "&& Boolean(document.activeElement?.matches("
++            "'a.replay-button.soundLink')))()"
++        )
++
++        def complete(focused_audio_link: bool) -> None:
++            if focused_audio_link:
++                self.web.eval("document.activeElement.click();")
++            else:
++                self.onEnterKey()
++
++        self.web.evalWithCallback(js, complete)
++
+     def onEnterKey(self) -> None:
+         if self.state == "question":
+             self._getTypedAnswer()
