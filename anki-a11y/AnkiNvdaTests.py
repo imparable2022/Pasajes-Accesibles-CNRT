@@ -339,6 +339,10 @@ def study_with_keyboard():
     transition = press("activate Study Now", "enter", 1.6)
     robot.sleep("2 seconds")
     question_auto = transition + "\\n" + spy.get_speech_at_index_until_now(idx)
+    addon_root = data_dir / "addons21" / "anki_ci_review_announcer"
+    note("REVIEW_ADDON_HOOK_STATUS",
+         webview_hook=(addon_root / "webview-hook.marker").exists(),
+         card_hook=(addon_root / "card-hook.marker").exists())
     question_auto_ok = FRONT.casefold() in question_auto.casefold()
     note("QUESTION_AUTOMATIC_NVDA", spoken=question_auto[:1500], success=question_auto_ok)
     note("study screen", focused=focus_description())
