@@ -451,6 +451,29 @@ def _speech_probe(kind):
     these checks. Preserves the full raw utterance evidence for failed cases.
     """
     samples = []
+    if kind.startswith("Math"):
+        # Perform the user-facing MathCAT command while our experimental
+        # MathML element still has keyboard focus. The original experiment
+        # only tried NVDA+Alt+M *after* moving the review cursor away.
+        entered_speech = press(f"{kind}: enter MathCAT directly", "NVDA+alt+m", 1.1)
+        spoken_segments = [entered_speech]
+        for gesture in ["space", "downArrow", "rightArrow", "space"]:
+            spoken_segments.append(press(f"{kind}: MathCAT structure "+gesture,
+                                         gesture, 0.75))
+        press(f"{kind}: leave MathCAT", "escape", 0.5)
+        combined = " ".join(spoken_segments).casefold()
+        entered = "not math" not in combined and bool(combined.strip()) and (
+            any(term in combined for term in
+                ("fraction","numerator","denominator","half","quarter",
+                 "power","squared","cubed","superscript",
+                 "math","equation","equals","plus")) and
+            "not math" not in entered_speech.casefold()
+        )
+        _semantic_check(kind,"mathcat_interactive_navigation",
+                        entered, spoken_segments,
+                        "MathCAT must recognize and explore an actual structured math object; plain glyphs do not pass")
+        samples.extend({"gesture":label,"speech":value} for label,value in
+                       zip(["NVDA+alt+m","space","downArrow","rightArrow","space"],spoken_segments))
     gestures = [
         ("announce focused control", "NVDA+tab", .5),
         ("switch browse/focus mode", "NVDA+space", .6),
