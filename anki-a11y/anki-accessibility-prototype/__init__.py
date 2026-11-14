@@ -62,19 +62,28 @@ REVIEW_JS = r"""
         const visible = normal(qa.innerText);
         const previouslyRead = normal(window.__ankiA11yPreviousQuestion);
         // Note: aria name for the question must not leak into answer speech.
-        const marker = qa.querySelector("#answer");
-        if (marker) {
-            try {
-                const range = qa.ownerDocument.createRange();
-                range.setStartAfter(marker);
-                range.setEnd(qa, qa.childNodes.length);
-                text = normal(range.cloneContents().textContent);
-            } catch (_) {
-                text = "";
-            }
-        }
-        if (!text && previouslyRead && visible.startsWith(previouslyRead)) {
+        // Prefer visible text difference. Reading Range.textContent directly
+        // is WRONG here: Anki appends our <script> to the HTML template,
+        // and textContent includes the *source code* of that script.
+        if (previouslyRead && visible.startsWith(previouslyRead)) {
             text = normal(visible.slice(previouslyRead.length));
+        }
+        if (!text) {
+            const marker = qa.querySelector("#answer");
+            if (marker) {
+                try {
+                    const range = qa.ownerDocument.createRange();
+                    range.setStartAfter(marker);
+                    range.setEnd(qa, qa.childNodes.length);
+                    const fragment = range.cloneContents();
+                    fragment.querySelectorAll(
+                        "script, style, template, noscript"
+                    ).forEach(el => el.remove());
+                    text = normal(fragment.textContent);
+                } catch (_) {
+                    text = "";
+                }
+            }
         }
         if (!text && !previouslyRead) {
             // For non-standard templates, silence is better than speaking
