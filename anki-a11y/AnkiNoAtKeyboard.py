@@ -14,6 +14,7 @@ from pathlib import Path
 import pyautogui
 import win32con
 import win32gui
+import win32process
 
 OUT = Path(os.environ["ANKI_A11Y_OUTPUT"])
 PROFILE = OUT / "isolated-profile"
@@ -116,7 +117,7 @@ def main():
             pyautogui.press("tab")
             time.sleep(.1)
             fg = win32gui.GetForegroundWindow()
-            focused = win32gui.GetGUIThreadInfo(win32gui.GetWindowThreadProcessId(fg)[0]).get("hwndFocus")
+            focused = win32gui.GetGUIThreadInfo(win32process.GetWindowThreadProcessId(fg)[0]).get("hwndFocus")
             seen.append({"focused_hwnd":int(focused or 0),
                          "window":win32gui.GetWindowText(fg)})
         record("TAB_NAVIGATION", sequence=seen)
