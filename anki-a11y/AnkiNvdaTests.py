@@ -167,7 +167,10 @@ def start_anki():
     robot.sleep("12 seconds")
     marker = data_dir / "addons21" / "anki_ci_review_announcer" / "loaded.marker"
     if not marker.exists():
-        raise AssertionError("Experimental reviewer announcement add-on did not load")
+        log = logfile.read_text(encoding="utf-8", errors="replace")[-12000:]
+        note("ADDON_LOAD_FAILURE", log=log, paths=[str(p) for p in target.rglob("*")],
+             process_exit=process.poll())
+        raise AssertionError("Experimental accessibility add-on did not load; inspect ADDON_LOAD_FAILURE")
     note("TEST_ADDON_LOADED", marker=str(marker))
     note("post-language-setup", title=focus_title(),
          focused=focus_description(),
