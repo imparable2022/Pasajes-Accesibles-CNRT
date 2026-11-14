@@ -1,0 +1,24 @@
+diff --git a/qt/aqt/sound.py b/qt/aqt/sound.py
+--- a/qt/aqt/sound.py
++++ b/qt/aqt/sound.py
+@@ -11,6 +11,7 @@
+ import sys
+ import time
+ import traceback
++from html import escape
+ import wave
+ from abc import ABC, abstractmethod
+ from collections.abc import Callable
+@@ -910,9 +911,10 @@
+     """
+ 
+     def repl(match: re.Match) -> str:
++        label = escape(tr.actions_replay_audio(), quote=True)
+         return f"""
+-<a class="replay-button soundLink" href=# onclick="pycmd('{match.group(1)}'); return false;" draggable="false">
+-    <svg class="playImage" viewBox="0 0 64 64" version="1.1">
++<a class="replay-button soundLink" href=# onclick="pycmd('{match.group(1)}'); return false;" draggable="false" aria-label="{label}" title="{label}">
++    <svg class="playImage" aria-hidden="true" focusable="false" viewBox="0 0 64 64" version="1.1">
+         <circle cx="32" cy="32" r="29" />
+         <path d="M56.502,32.301l-37.502,20.101l0.329,-40.804l37.173,20.703Z" />
+     </svg>
