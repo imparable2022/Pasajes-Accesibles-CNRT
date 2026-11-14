@@ -101,6 +101,15 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "NVDA installation exit: $LASTEXITCODE" }
           } finally { Pop-Location }
 
+      - name: Give NVDA test speech synthesizer a nonzero MathCAT rate
+        shell: pwsh
+        run: |
+          # CI-only fix: NVDA 2026.3.1 MathCAT divides by 2*synth._get_rate().
+          # NVDA's speech-spy synth defaults to 0, causing ZeroDivisionError
+          # on valid native MathML even in Chrome. Keep Anki/MathML untouched.
+          python anki-a11y/patch_nvda_spy_rate.py nvda/tests/system/libraries/SystemTestSpy/speechSpySynthDriver.py
+          if ($LASTEXITCODE -ne 0) { throw "Cannot patch test synthesizer rate" }
+
       - name: Register Anki tests in NVDA Robot test harness
         shell: pwsh
         run: |
