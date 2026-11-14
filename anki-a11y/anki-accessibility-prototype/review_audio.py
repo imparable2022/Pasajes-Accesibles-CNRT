@@ -61,7 +61,39 @@ def update_button(card, question):
         "if(el) el.hidden=%s;})();" % (BUTTON_ID,show)
     )
 
+def label_existing_icons(html, card, context):
+    """Mirror the small upstream audio-icon patch for the native Anki UI.
+
+    The original replay anchors remain intact and keep their play:q:0 bridges.
+    In production the upstream patch should be preferred over JS injection.
+    """
+    if not OPTIONS.get("enable_audio_replay_button", False):
+        return html
+    if context not in ("reviewQuestion", "reviewAnswer"):
+        return html
+    script = r"""
+<script>
+onShownHook.push(() => {
+  document.querySelectorAll("a.replay-button.soundLink").forEach(link => {
+    if (!link.getAttribute("aria-label")) {
+      link.setAttribute("aria-label", "Replay Audio");
+    }
+    if (!link.getAttribute("title")) {
+      link.setAttribute("title", "Replay Audio");
+    }
+    const icon = link.querySelector("svg");
+    if (icon) {
+      icon.setAttribute("aria-hidden", "true");
+      icon.setAttribute("focusable", "false");
+    }
+  });
+});
+</script>
+"""
+    return html + script
+
 def register_audio_hooks():
+    gui_hooks.card_will_show.append(label_existing_icons)
     gui_hooks.webview_will_set_content.append(inject_button)
     gui_hooks.webview_did_receive_js_message.append(handle_command)
     gui_hooks.reviewer_did_show_question.append(
