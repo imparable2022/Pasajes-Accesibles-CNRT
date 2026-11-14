@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from aqt import gui_hooks, mw
+from aqt.qt import QTimer
 
 HERE = Path(__file__).resolve().parent
 HERE.joinpath("loaded.marker").write_text("loaded", encoding="utf-8")
@@ -193,3 +194,29 @@ def _editor_note_loaded(editor) -> None:
 
 gui_hooks.card_will_show.append(_card_hook)
 gui_hooks.editor_did_load_note.append(_editor_note_loaded)
+
+# Optional CI diagnostics. This reads the rendered UI state after updates;
+# it does not alter Anki's collection or the accessible experience.
+def _debug_state(side):
+    def capture():
+        if not mw or not mw.reviewer:
+            return
+        code = r'''(() => {
+            const qa=document.querySelector("#qa");
+            const hr=qa?.querySelector("#answer");
+            return JSON.stringify({
+                answerMarker: !!hr, side:qa?.dataset.ankiA11yLastSide,
+                derived:qa?.dataset.ankiA11yLastDerived,
+                text:qa?.innerText?.slice(0,500),
+                aria:qa?.getAttribute("aria-label"),
+                active:document.activeElement?.id,
+                previous:window.__ankiA11yPreviousQuestion,
+            });
+        })()'''
+        def callback(value):
+            HERE.joinpath("reviewer-debug-" + side + ".json").write_text(str(value), encoding="utf-8")
+        mw.reviewer.web.evalWithCallback(code, callback)
+    QTimer.singleShot(1800, capture)
+
+gui_hooks.reviewer_did_show_question.append(lambda card: _debug_state("question"))
+gui_hooks.reviewer_did_show_answer.append(lambda card: _debug_state("answer"))
