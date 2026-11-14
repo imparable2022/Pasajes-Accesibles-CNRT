@@ -37,6 +37,10 @@ jobs:
         shell: pwsh
         run: python -m pip install robotframework==7.5 robotremoteserver==1.1.1 robotframework-screencaplibrary==1.6.0 pywin32
 
+      - name: Validate policy defaults, editor instrumentation and JS syntax
+        shell: pwsh
+        run: python -m unittest discover -s anki-a11y -p test_policy.py -v
+
       - name: Install verified official Anki
         shell: pwsh
         env:
