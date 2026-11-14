@@ -23,8 +23,8 @@ PREFIX = "NVDA Fixture - "
 CASES = [
     ("Image", "Basic", "Accessible image: <img src='fixture-green.png' alt='Green square on white background'>", "Image answer"),
     ("Math", "Basic", r"Equation: \(\frac{1}{2} + \frac{1}{4}\)", "Three quarters"),
-    ("MathExponent", "Basic", r"Exponent: \\(x^2 + y^3\\)", "Powers answer"),
-    ("MathEquation", "Basic", r"Equation: \\(2x+3=7\\)", "x equals 2"),
+    ("MathExponent", "Basic", r"Exponent: \(x^2 + y^3\)", "Powers answer"),
+    ("MathEquation", "Basic", r"Equation: \(2x+3=7\)", "x equals 2"),
     ("Audio", "Basic", "Listen: [sound:fixture-tone.wav]", "Audio answer"),
     ("Long", "Basic", "Read the full explanation. " + ("Many meaningful words are shown here. " * 42), "Long answer"),
     ("Typed", "Basic (type in the answer)", "Type the name of the animal", "cat"),
