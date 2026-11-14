@@ -65,6 +65,10 @@ REVIEW_JS = r"""
     ];
     // In particular, Anki's type-in-answer box MUST retain focus.
     if (qa.querySelector(interactive.join(","))) return;
+    // MathJax can still be asynchronously typesetting when a card appears.
+    // Do not take focus away from its accessible equation structure, even
+    // when optional rich-region focusing is enabled.
+    if (qa.querySelector("mjx-container, math, svg, .MathJax")) return;
 
     const normalize = value => (value || "").replace(/\s+/g, " ").trim();
     const visible = normalize(qa.innerText);
