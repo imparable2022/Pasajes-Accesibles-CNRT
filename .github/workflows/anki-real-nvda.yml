@@ -89,7 +89,7 @@ jobs:
           if (Test-Path out/a11y/speech.json) {
             $j = Get-Content out/a11y/speech.json -Raw | ConvertFrom-Json
             Write-Host "Speech records: $($j.records.Count)"
-            $j.records | Where-Object { $_.stage -match 'AUTOMATIC_NVDA|HOOK_STATUS|CONTENT_SPOKEN|CARD_READING_FAILURE|ACCESSIBILITY_FINDING|EDITOR_FRONT_LABEL|EDITOR_BACK_LABEL|REVIEW_GRADED' } | ConvertTo-Json -Depth 6 | Write-Host
+            $j.records | Where-Object { $_.stage -match 'AUTOMATIC_NVDA|HOOK_STATUS|CONTENT_SPOKEN|CARD_READING_FAILURE|ACCESSIBILITY_FINDING|EDITOR_FRONT_LABEL|EDITOR_BACK_LABEL|REVIEWER_DOM_STATE|REVIEW_GRADED' } | ConvertTo-Json -Depth 6 | Write-Host
           } else { Write-Host 'No speech trace produced' }
 
       - name: Upload speech evidence and logs
