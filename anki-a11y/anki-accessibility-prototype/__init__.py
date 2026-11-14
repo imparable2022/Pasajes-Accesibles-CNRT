@@ -26,6 +26,7 @@ DEFAULTS = {
     "announce_answers": True,
     "max_auto_speech_characters": 800,
     "label_editor_fields": True,
+    "focus_noninteractive_rich_cards": False,
 }
 try:
     config = mw.addonManager.getConfig(__name__) or {}
@@ -38,79 +39,91 @@ REVIEW_JS = r"""
 (function () {
     const qa = document.getElementById("qa");
     if (!qa) return;
-    // Only an explicit opt-in changes focus behavior. 'type in the answer',
-    // cloze filters and other interactive templates must retain control.
+
+    // The reviewer reuses #qa for the next card. Restore the original
+    // semantics before inspecting new content so stale question labels never
+    // remain on an answer, long card, image or interactive card.
+    const previousState = window.__ankiA11yReviewFocusState;
+    if (previousState && previousState.node === qa) {
+        for (const [name, value] of Object.entries(previousState.attrs)) {
+            if (value === null) qa.removeAttribute(name);
+            else qa.setAttribute(name, value);
+        }
+        window.__ankiA11yReviewFocusState = null;
+    }
+
     if (!__ENABLED__) return;
     const side = __SIDE__;
     if ((side === "question" && !__QUESTION_ENABLED__) ||
         (side === "answer" && !__ANSWER_ENABLED__)) return;
-    const disallowed = [
+
+    const interactive = [
         "input", "textarea", "select", "button", "audio[controls]",
         "video[controls]", "[contenteditable='true']",
         "a[href]", "[role='textbox']", "[role='application']",
         "[tabindex]:not([tabindex='-1'])"
     ];
-    if (qa.querySelector(disallowed.join(","))) return;
-    // Skip rich visual/mathematical/media content rather than flattening it
-    // into an incomplete label. It remains reachable via Anki's normal DOM.
-    if (qa.querySelector("img, svg, math, canvas, iframe, object, video, audio")) return;
+    // In particular, Anki's type-in-answer box MUST retain focus.
+    if (qa.querySelector(interactive.join(","))) return;
 
-    // Derive answer speech from the displayed text, excluding text already
-    // spoken in the question. Standard Basic has <hr id="answer">, but not
-    // every template follows that convention. If no unambiguous answer can
-    // be found, do not invent one.
+    const normalize = value => (value || "").replace(/\s+/g, " ").trim();
+    const visible = normalize(qa.innerText);
+    const rich = qa.querySelector(
+        "img, svg, math, canvas, iframe, object, video, audio, table, " +
+        "ul, ol, pre, code, h1, h2, h3, h4, h5, h6, blockquote"
+    );
     let text = "";
-    const normal = value => (value || "").replace(/\s+/g, " ").trim();
-    if (side === "answer") {
-        const visible = normal(qa.innerText);
-        const previouslyRead = normal(window.__ankiA11yPreviousQuestion);
-        // Note: aria name for the question must not leak into answer speech.
-        // Prefer visible text difference. Reading Range.textContent directly
-        // is WRONG here: Anki appends our <script> to the HTML template,
-        // and textContent includes the *source code* of that script.
-        if (previouslyRead && visible.startsWith(previouslyRead)) {
-            text = normal(visible.slice(previouslyRead.length));
-        }
-        if (!text) {
-            const marker = qa.querySelector("#answer");
-            if (marker) {
-                try {
-                    const range = qa.ownerDocument.createRange();
-                    range.setStartAfter(marker);
-                    range.setEnd(qa, qa.childNodes.length);
-                    const fragment = range.cloneContents();
-                    fragment.querySelectorAll(
-                        "script, style, template, noscript"
-                    ).forEach(el => el.remove());
-                    text = normal(fragment.textContent);
-                } catch (_) {
-                    text = "";
-                }
-            }
-        }
-        if (!text && !previouslyRead) {
-            // For non-standard templates, silence is better than speaking
-            // the entire question twice or misrepresenting the answer.
-            return;
-        }
+    if (side === "question") {
+        text = visible;
+        window.__ankiA11yPreviousQuestion = visible;
     } else {
-        text = normal(qa.innerText);
-        window.__ankiA11yPreviousQuestion = text;
+        const question = normalize(window.__ankiA11yPreviousQuestion);
+        // Only remove an exact visible prefix from the answer side.
+        if (question && visible.startsWith(question)) {
+            text = normalize(visible.slice(question.length));
+        }
+        if (!text && qa.querySelector("#answer")) {
+            // Some templates include markup between question and answer.
+            // textContent contains injected scripts, so remove them first.
+            try {
+                const marker = qa.querySelector("#answer");
+                const range = qa.ownerDocument.createRange();
+                range.setStartAfter(marker);
+                range.setEnd(qa, qa.childNodes.length);
+                const fragment = range.cloneContents();
+                fragment.querySelectorAll("script,style,template,noscript")
+                    .forEach(node => node.remove());
+                text = normalize(fragment.textContent);
+            } catch (_) {}
+        }
     }
     qa.dataset.ankiA11yLastSide = side;
     qa.dataset.ankiA11yLastDerived = text.slice(0, 120);
-    if (!text || text.length > __LIMIT__) return;
 
-    // Preserve the actual card DOM for object navigation and review actions.
-    // A focusable named group produces NVDA speech in Qt WebEngine.
+    const ordinary = Boolean(text) && !rich && text.length <= __LIMIT__;
+    const focusRich = !ordinary && __RICH_FOCUS__;
+    if (!ordinary && !focusRich) return;
+
+    const snapshot = {};
+    for (const attribute of ["role", "tabindex", "aria-label"]) {
+        snapshot[attribute] = qa.getAttribute(attribute);
+    }
+    window.__ankiA11yReviewFocusState = {node: qa, attrs: snapshot};
+
     qa.setAttribute("tabindex", "-1");
-    qa.setAttribute("role", "group");
-    qa.setAttribute("aria-label", text);
-    // Calling focus synchronously in onShownHook follows Anki's render queue.
+    if (ordinary) {
+        qa.setAttribute("role", "group");
+        qa.setAttribute("aria-label", text);
+    } else {
+        // Optional structural navigation: focus the region without flattening
+        // images, mathematics, headings or long text into an aria-label.
+        qa.setAttribute("role", "region");
+        qa.setAttribute("aria-label", side === "question" ?
+            "Question content" : "Answer content");
+    }
     qa.focus({ preventScroll: true });
 })();
 """
-
 EDITOR_JS = r"""
 (function () {
     if (window.__ankiA11yEditorLabels) {
@@ -187,6 +200,13 @@ EDITOR_JS = r"""
 def _card_hook(html: str, card, context: str) -> str:
     if context not in ("reviewQuestion", "reviewAnswer"):
         return html
+    # No review HTML, runtime script, or focus changes at all when disabled.
+    if not OPTIONS["announce_review_cards"]:
+        return html
+    if context == "reviewQuestion" and not OPTIONS["announce_questions"]:
+        return html
+    if context == "reviewAnswer" and not OPTIONS["announce_answers"]:
+        return html
     side = "question" if context == "reviewQuestion" else "answer"
     if CI_MODE:
         HERE.joinpath("card-hook.marker").write_text(side, encoding="utf-8")
@@ -196,6 +216,7 @@ def _card_hook(html: str, card, context: str) -> str:
         .replace("__ANSWER_ENABLED__", json.dumps(bool(OPTIONS["announce_answers"])))
         .replace("__SIDE__", json.dumps(side))
         .replace("__LIMIT__", str(OPTIONS["max_auto_speech_characters"]))
+        .replace("__RICH_FOCUS__", json.dumps(bool(OPTIONS["focus_noninteractive_rich_cards"])))
     )
     return html + "<script>onShownHook.push(() => {\n" + script + "\n});</script>"
 
