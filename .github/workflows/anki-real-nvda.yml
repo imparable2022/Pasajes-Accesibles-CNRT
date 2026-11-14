@@ -75,7 +75,7 @@ jobs:
           New-Item -ItemType Directory -Force out/a11y | Out-Null
           Push-Location nvda
           try {
-            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --outputdir ../out/a11y tests/system/robot/ankiNvda.robot
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include anki --outputdir ../out/a11y tests/system/robot/ankiNvda.robot
             if ($LASTEXITCODE -ne 0) { throw "NVDA Robot suite exit $LASTEXITCODE" }
           } finally { Pop-Location }
 
