@@ -115,6 +115,7 @@ jobs:
           ANKI_A11Y_FIXTURE_SOURCE: ${{ github.workspace }}\anki-a11y\anki-fixture-loader
           ANKI_A11Y_CI: '1'
           ANKI_A11Y_RICH_FOCUS: ${{ matrix.rich_focus }}
+          ANKI_A11Y_FIXTURE_FILTER: Math,MathExponent,MathEquation,Image,Audio
         run: |
           New-Item -ItemType Directory -Force out/a11y | Out-Null
           Push-Location nvda
