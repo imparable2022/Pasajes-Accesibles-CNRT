@@ -235,7 +235,7 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
     def test_mathml_focus_stays_off_without_optin(self):
         addon, hooks = load_addon()
         self.assertFalse(addon.OPTIONS["experimental_mathml_focus"])
-        self.assertEqual(len(hooks.card_will_show),2)
+        self.assertEqual(len(hooks.card_will_show),3)
         self.assertEqual(hooks.card_will_show[1]("Math",None,"reviewQuestion"),"Math")
 
     def test_mathml_opt_in_preserves_structured_math(self):
@@ -246,6 +246,15 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
         self.assertIn("startup.toMML",html)
         self.assertIn('math.setAttribute("tabindex", "0")',html)
         self.assertNotIn('math.setAttribute("aria-label"',html)
+
+    def test_native_replay_icon_keeps_original_keyboard_bridge(self):
+        addon, hooks = load_addon({"enable_audio_replay_button":True})
+        body = '<a class="replay-button soundLink" href="#" onclick="pycmd(\'play:q:0\')"></a>'
+        updated = hooks.card_will_show[2](body,None,"reviewQuestion")
+        self.assertTrue(updated.startswith(body))
+        self.assertIn('setAttribute("aria-label", "Replay Audio")', updated)
+        self.assertIn('setAttribute("aria-hidden", "true")', updated)
+        self.assertEqual(hooks.card_will_show[2](body,None,"other"),body)
 
     def test_audio_button_is_opt_in_and_reuses_reviewer_replay(self):
         addon, hooks = load_addon({"enable_audio_replay_button":True})
@@ -268,11 +277,12 @@ class AnkiAccessibilityPolicyTests(unittest.TestCase):
             (False,None), "unrelated", bar),(False,None))
 
     def test_javascript_is_valid(self):
-        addon, hooks = load_addon({"announce_review_cards": True, "experimental_mathml_focus": True})
+        addon, hooks = load_addon({"announce_review_cards": True, "experimental_mathml_focus": True, "enable_audio_replay_button": True})
         programs = [
             hooks.card_will_show[0]("", None, "reviewQuestion"),
             hooks.card_will_show[0]("", None, "reviewAnswer"),
             addon.EDITOR_JS,
+            hooks.card_will_show[2]("", None, "reviewQuestion"),
             hooks.card_will_show[1]("", None, "reviewQuestion")
             if addon.OPTIONS.get("experimental_mathml_focus", False)
             else "",
