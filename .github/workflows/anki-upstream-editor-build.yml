@@ -38,6 +38,16 @@ jobs:
           git diff --stat
           test "$(git diff --name-only | wc -l)" -eq 4
 
+      - name: Make upstream setup paths available at GitHub workspace root
+        shell: bash
+        run: |
+          # Upstream's composite setup action resolves .tool-versions,
+          # rust-toolchain.toml and tools/install-n2 from the current
+          # GitHub workspace. The audited Anki checkout is nested.
+          cp upstream-anki/.tool-versions .tool-versions
+          cp upstream-anki/rust-toolchain.toml rust-toolchain.toml
+          ln -s upstream-anki/tools tools
+
       - name: Setup official Anki build environment
         uses: ./upstream-anki/.github/actions/setup-anki
 
