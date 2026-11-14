@@ -129,7 +129,19 @@ def start_anki():
             press("find language confirmation", "tab", 0.5)
     else:
         note("first run dialog unidentified", title=focus_title())
-    robot.sleep("13 seconds")
+    robot.sleep("3 seconds")
+    # Another genuine Anki first-run confirmation appears after language choice.
+    # Observed on Windows runner: buttons 'Yes' and 'No', with focus on 'No'.
+    for i in range(6):
+        focus=focus_description()
+        if "No" in focus and "button" in focus:
+            press("decline first-run optional prompt", "enter", 2.0)
+            break
+        if "Yes" in focus and "button" in focus:
+            press("move from Yes to No", "tab", 0.5)
+            continue
+        break
+    robot.sleep("12 seconds")
     note("post-language-setup", title=focus_title(),
          focused=focus_description(),
          folder_contents=[str(p.relative_to(data_dir)) for p in data_dir.rglob("*")][:40])
