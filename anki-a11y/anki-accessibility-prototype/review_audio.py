@@ -109,7 +109,7 @@ def install_audio_link_return_shortcut():
         def on_return():
             js = """(function() {
               const target = document.activeElement;
-              return Boolean(target?.matches('a.replay-button.soundLink'));
+              return Boolean(document.hasFocus() && target?.matches('a.replay-button.soundLink'));
             })()"""
             def completed(is_audio_link):
                 if is_audio_link:
