@@ -106,6 +106,8 @@ jobs:
         run: |
           Copy-Item anki-a11y/AnkiNvdaTests.py nvda/tests/system/robot/
           Copy-Item anki-a11y/ankiNvda.robot nvda/tests/system/robot/
+          Copy-Item anki-a11y/MathCATChromeControl.py nvda/tests/system/robot/
+          Copy-Item anki-a11y/ankiChromeMathcat.robot nvda/tests/system/robot/
 
       - name: Run real NVDA speech and keyboard smoke
         shell: pwsh
@@ -166,6 +168,22 @@ jobs:
             throw "Some semantic criteria are not proven by actual NVDA speech: $($failed.Count)"
           }
 
+      - name: Control experiment - true MathML with Chrome and NVDA MathCAT
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        env:
+          ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\a11y
+        run: |
+          if (-not (Test-Path nvda/tests/system/robot/ankiChromeMathcat.robot)) {
+            throw "Chrome MathCAT control suite was not prepared"
+          }
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include mathcat --outputdir ../out/a11y --output chrome-output.xml --log chrome-log.html --report chrome-report.html tests/system/robot/ankiChromeMathcat.robot
+            if ($LASTEXITCODE -ne 0) { throw "Chrome MathCAT control exit $LASTEXITCODE" }
+          } finally { Pop-Location }
+
       - name: Print NVDA speech trace for diagnosis
         if: always()
         shell: pwsh
@@ -185,6 +203,9 @@ jobs:
           path: |
             out/a11y/speech.json
             out/a11y/semantic-audit.json
+            out/a11y/chrome-mathcat-control.json
+            out/a11y/chrome-output.xml
+            out/a11y/chrome-log.html
             out/a11y/anki-startup.log
             out/a11y/no-at-keyboard.json
             out/a11y/no-at-anki-startup.log
