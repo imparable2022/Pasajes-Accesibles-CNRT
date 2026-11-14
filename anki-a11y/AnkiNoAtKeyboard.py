@@ -17,6 +17,7 @@ import pyautogui
 import win32con
 import win32gui
 import win32process
+import uiautomation as uia
 
 OUT = Path(os.environ["ANKI_A11Y_OUTPUT"])
 PROFILE = OUT / "isolated-profile"
@@ -142,9 +143,16 @@ def main():
             time.sleep(.1)
             fg = win32gui.GetForegroundWindow()
             focused = focused_window_handle(fg)
+            try:
+                ctrl = uia.GetFocusedControl()
+                info = {"uia_name":ctrl.Name if ctrl else None,
+                        "uia_role":ctrl.ControlTypeName if ctrl else None}
+            except Exception as err:
+                info = {"uia_error":repr(err)}
             seen.append({"focused_hwnd":int(focused or 0),
-                         "window":win32gui.GetWindowText(fg)})
+                         "window":win32gui.GetWindowText(fg), **info})
         record("TAB_NAVIGATION", sequence=seen)
+        record("UI_AUTOMATION_FOCUSED_NAMES", names=[s.get("uia_name") for s in seen if s.get("uia_name")])
         if not any(x["focused_hwnd"] for x in seen):
             raise AssertionError("No keyboard focus exposed by Windows during Tab traversal")
         key("CLOSE_ADD_DIALOG_WITH_KEYBOARD", "escape", pause=1)
