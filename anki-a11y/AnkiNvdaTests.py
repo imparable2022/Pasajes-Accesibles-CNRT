@@ -149,15 +149,29 @@ def start_anki():
 def create_deck_via_keyboard():
     activate_anki()
     press("deck screen", "d", 1.2)
-    select_button(["Create Deck","Create deck","Crear mazo","Crear baraja"], limit=18)
-    press("open create deck", "enter", 0.9)
-    focus_title(); focus_description()
-    # Qt input dialog ordinarily selects the default name.
-    press("select deck name", "control+a", 0.2)
+    select_button(["Create Deck", "Crear mazo", "Crear baraja"], limit=18)
+    opened=press("open create deck","enter",1.0)
+    if not any(t in opened.casefold() for t in ["deck","mazo","baraja"]):
+        raise AssertionError(f"No Create Deck dialog announcement: {opened}")
+    # Do not type before the input is *actually* focused.
+    field=None
+    for i in range(10):
+        focus=focus_description()
+        if any(t in focus.casefold() for t in ["edit", "editable", "text field", "edición"]):
+            field=focus
+            break
+        press("find deck name edit "+str(i),"tab",0.5)
+    if field is None:
+        raise AssertionError("Cannot reach new deck name edit by Tab; capture evidence")
+    note("DECK_NAME_FIELD_ACCESSIBLE",focused=field)
+    press("select current name", "control+a",0.2)
     paste("type deck name",DECK)
-    press("confirm new deck", "enter", 1.3)
-    rows=wait_for("SELECT name FROM decks WHERE name = ?",(DECK,))
-    note("DECK_CREATED_VERIFIED", rows=rows)
+    press("confirm new deck","enter",1.8)
+    press("refresh decks","d",1.2)
+    select_button([DECK],limit=24)
+    note("DECK_CREATED_VERIFIED_BY_NVDA",name=DECK)
+    # Leave the new deck open so the Add dialog uses its selected deck.
+    press("open new deck","enter",1.2)
 
 def add_card_via_keyboard():
     activate_anki()
