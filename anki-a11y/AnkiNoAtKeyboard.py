@@ -115,6 +115,8 @@ def main():
         raise AssertionError("Anki test add-on installation is missing")
     opts = json.loads(addon_config.read_text(encoding="utf-8"))
     opts["announce_review_cards"] = False
+    opts["experimental_mathml_focus"] = False
+    opts["enable_audio_replay_button"] = False
     opts["label_editor_fields"] = True
     addon_config.write_text(json.dumps(opts), encoding="utf-8")
     record("REVIEW_FOCUS_DISABLED", actual_config=opts)
