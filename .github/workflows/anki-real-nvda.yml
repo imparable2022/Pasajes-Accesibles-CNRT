@@ -184,6 +184,21 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Chrome MathCAT control exit $LASTEXITCODE" }
           } finally { Pop-Location }
 
+      - name: Surface NVDA MathCAT traceback and runtime assets
+        if: always()
+        shell: pwsh
+        run: |
+          $logs = Get-ChildItem "out/a11y/nvdaTestRunLogs" -Filter *.log -File -ErrorAction SilentlyContinue
+          if ($logs) {
+            $logs | ForEach-Object {
+              Write-Host "NVDA log: $($_.Name)"
+              Select-String -Path $_.FullName -Pattern "MathCAT|mathPres|Traceback|ERROR" -Context 2,7 |
+                Select-Object -Last 15 | ForEach-Object { Write-Host $_.ToString() }
+            }
+          } else {
+            Write-Host "No saved NVDA logs found at expected test output folder"
+          }
+
       - name: Print NVDA speech trace for diagnosis
         if: always()
         shell: pwsh
@@ -206,6 +221,7 @@ jobs:
             out/a11y/chrome-mathcat-control.json
             out/a11y/chrome-output.xml
             out/a11y/chrome-log.html
+            out/a11y/nvdaTestRunLogs/
             out/a11y/anki-startup.log
             out/a11y/no-at-keyboard.json
             out/a11y/no-at-anki-startup.log
