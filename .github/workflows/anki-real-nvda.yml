@@ -78,6 +78,7 @@ jobs:
         env:
           ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\a11y
           ANKI_A11Y_ADDON_SOURCE: ${{ github.workspace }}\anki-a11y\anki-accessibility-prototype
+          ANKI_A11Y_FIXTURE_SOURCE: ${{ github.workspace }}\anki-a11y\anki-fixture-loader
           ANKI_A11Y_CI: '1'
         run: |
           New-Item -ItemType Directory -Force out/a11y | Out-Null
