@@ -35,7 +35,7 @@ jobs:
 
       - name: Install Robot Framework dependencies
         shell: pwsh
-        run: python -m pip install robotframework==7.5 robotremoteserver==1.1.1 robotframework-screencaplibrary==1.6.0
+        run: python -m pip install robotframework==7.5 robotremoteserver==1.1.1 robotframework-screencaplibrary==1.6.0 pywin32
 
       - name: Install verified official Anki
         shell: pwsh
