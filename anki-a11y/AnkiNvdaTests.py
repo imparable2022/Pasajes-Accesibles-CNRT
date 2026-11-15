@@ -461,7 +461,9 @@ def _speech_probe(kind):
         nav_speech = press(f"{kind}: move navigator to focused math", "NVDA+numpadMinus", .55)
         spy.dump_speech_to_log()
         robot.sleep(".4 seconds")
-        note("MATH_FOCUSED_ACCESSIBILITY_OBJECT", kind=kind, navigator_speech=nav_speech[:900])
+        math_context = spy.get_math_context()
+        note("MATH_FOCUSED_ACCESSIBILITY_OBJECT", kind=kind,
+             navigator_speech=nav_speech[:900], math_context=math_context[:6000])
         # Perform the user-facing MathCAT command while our experimental
         # MathML target still has keyboard focus and the navigator is aligned.
         entered_speech = press(f"{kind}: enter MathCAT directly", "NVDA+alt+m", 1.1)
