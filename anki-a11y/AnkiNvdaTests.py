@@ -472,8 +472,10 @@ def _speech_probe(kind):
         # Never issue MathCAT gestures until the math-mode command has
         # actually activated. This was the source of spurious review errors.
         entered_mode = "not math" not in entered_speech.casefold() and bool(entered_speech.strip())
+        mathcat_gestures = ["space", "downArrow", "downArrow", "rightArrow",
+                            "upArrow", "rightArrow", "space"]
         if entered_mode:
-            for gesture in ["space", "downArrow", "rightArrow", "space"]:
+            for gesture in mathcat_gestures:
                 spoken_segments.append(press(f"{kind}: MathCAT structure "+gesture,
                                              gesture, 0.75))
             press(f"{kind}: leave MathCAT", "escape", 0.5)
@@ -488,8 +490,24 @@ def _speech_probe(kind):
         _semantic_check(kind,"mathcat_interactive_navigation",
                         entered, spoken_segments,
                         "MathCAT must recognize and explore an actual structured math object; plain glyphs do not pass")
+        # Prove that ZoomIn (DownArrow) reaches inside composite structures,
+        # not merely between top-level terms. The following RightArrow must
+        # then move between the composite's own children.
+        if entered_mode and kind in ("Math", "MathExponent") and len(spoken_segments) >= 5:
+            deep_first = spoken_segments[3].casefold().strip()
+            deep_next = spoken_segments[4].casefold().strip()
+            if kind == "Math":
+                deep_ok = deep_first == "1" and deep_next == "2"
+                deep_note = "DownArrow must enter the fraction numerator and RightArrow must reach the denominator"
+            else:
+                deep_ok = ("x" in deep_first and
+                           any(token in deep_next for token in ("2", "two")))
+                deep_note = "DownArrow must enter the power base and RightArrow must reach the exponent"
+            _semantic_check(kind, "mathcat_deep_component_navigation",
+                            deep_ok, [deep_first, deep_next], deep_note)
+        labels = ["NVDA+alt+m"] + mathcat_gestures
         samples.extend({"gesture":label,"speech":value} for label,value in
-                       zip(["NVDA+alt+m","space","downArrow","rightArrow","space"],spoken_segments))
+                       zip(labels,spoken_segments))
     gestures = [
         ("announce focused control", "NVDA+tab", .5),
         ("switch browse/focus mode", "NVDA+space", .6),
