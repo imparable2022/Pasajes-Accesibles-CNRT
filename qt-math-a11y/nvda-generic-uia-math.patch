@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] UIA: expose standard MathML custom-property objects as math
+
+NVDA already registers Microsoft Word's MathML UIA custom property. Chromium
+uses the same property GUID for web math. Reuse that transport generically
+when a UIA provider exposes a localized control type of "math".
+---
+ source/NVDAObjects/UIA/__init__.py | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/source/NVDAObjects/UIA/__init__.py b/source/NVDAObjects/UIA/__init__.py
+--- a/source/NVDAObjects/UIA/__init__.py
++++ b/source/NVDAObjects/UIA/__init__.py
+@@
+ 	def findOverlayClasses(self, clsList):
+ 		UIAControlType = self.UIAElement.cachedControlType
+ 		UIAClassName = self.UIAElement.cachedClassName
++		UIALocalizedControlType = self.UIAElement.cachedLocalizedControlType or ""
+@@
+ 		if UIAControlType == UIAHandler.UIA_ProgressBarControlTypeId:
+ 			clsList.insert(0, ProgressBar)
++		# Microsoft Word and Chromium expose structured mathematics through
++		# the same registered MathML UIA custom property. Allow other UIA
++		# providers (for example Qt WebEngine) to use that interoperable
++		# transport without needing an application-specific overlay.
++		if UIALocalizedControlType.casefold() == "math":
++			clsList.insert(0, UIAMath)
+@@
+ class UIColumnHeader(UIA):
+@@
+ 	def _get_description(self):
+@@
+ 		return " ".join([x for x in (description, itemStatus) if x and not x.isspace()])
++
++
++class UIAMath(UIA):
++	"""UIA mathematical object exposing the shared Word/Chromium MathML property."""
++
++	def _get_mathMl(self):
++		try:
++			return self._getUIACacheablePropertyValue(self._UIACustomProps.word_mathml.id)
++		except COMError:
++			return None
++
++	def _get_role(self):
++		if self.mathMl:
++			return controlTypes.Role.MATH
++		return super().role
