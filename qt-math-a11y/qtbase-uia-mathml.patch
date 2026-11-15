@@ -1,0 +1,74 @@
+diff --git a/src/gui/accessible/qaccessible_base.h b/src/gui/accessible/qaccessible_base.h
+index 04efeddf..34031c40 100644
+--- a/src/gui/accessible/qaccessible_base.h
++++ b/src/gui/accessible/qaccessible_base.h
+@@ -382,6 +382,7 @@ public:
+         Custom,
+         Level,
+         Locale,
++        MathML,
+         Orientation,
+     };
+     Q_ENUM(Attribute)
+
+diff --git a/src/plugins/platforms/windows/uiautomation/qwindowsuiamainprovider.cpp b/src/plugins/platforms/windows/uiautomation/qwindowsuiamainprovider.cpp
+index 6bd3c939..32558f6b 100644
+--- a/src/plugins/platforms/windows/uiautomation/qwindowsuiamainprovider.cpp
++++ b/src/plugins/platforms/windows/uiautomation/qwindowsuiamainprovider.cpp
+@@ -40,6 +40,30 @@ QT_BEGIN_NAMESPACE
+ 
+ using namespace QWindowsUiAutomation;
+ 
++namespace {
++
++PROPERTYID mathMlPropertyId()
++{
++    static const PROPERTYID id = [] {
++        ComPtr<IUIAutomationRegistrar> registrar;
++        if (FAILED(CoCreateInstance(CLSID_CUIAutomationRegistrar, nullptr, CLSCTX_INPROC_SERVER,
++                                    IID_PPV_ARGS(&registrar))))
++            return PROPERTYID{};
++
++        static const GUID mathMlGuid = {
++            0xfa170ab3, 0x3229, 0x4e7c, { 0x82, 0x7f, 0xdd, 0x05, 0xee, 0x04, 0x81, 0xd9 }
++        };
++        UIAutomationPropertyInfo info = { mathMlGuid, L"MathML", UIAutomationType_String };
++        PROPERTYID propertyId = 0;
++        if (FAILED(registrar->RegisterProperty(&info, &propertyId)))
++            return PROPERTYID{};
++        return propertyId;
++    }();
++    return id;
++}
++
++} // unnamed namespace
++
+ // Returns a cached instance of the provider for a specific accessible interface.
+ ComPtr<QWindowsUiaMainProvider> QWindowsUiaMainProvider::providerForAccessible(QAccessibleInterface *accessible)
+ {
+@@ -528,6 +552,16 @@ HRESULT QWindowsUiaMainProvider::GetPropertyValue(PROPERTYID idProp, VARIANT *pR
+ 
+     bool topLevelWindow = accessible->parent() && (accessible->parent()->role() == QAccessible::Application);
+ 
++    const PROPERTYID mathPropertyId = mathMlPropertyId();
++    if (mathPropertyId && idProp == mathPropertyId) {
++        if (QAccessibleAttributesInterface *attributesIface = accessible->attributesInterface()) {
++            const QVariant mathMl = attributesIface->attributeValue(QAccessible::Attribute::MathML);
++            if (mathMl.isValid())
++                *pRetVal = QComVariant{ mathMl.toString() }.release();
++        }
++        return S_OK;
++    }
++
+     switch (idProp) {
+     case UIA_ProcessIdPropertyId:
+         // PID
+@@ -655,6 +689,8 @@ HRESULT QWindowsUiaMainProvider::GetPropertyValue(PROPERTYID idProp, VARIANT *pR
+         // https://www.w3.org/TR/core-aam-1.2/#role-map-blockquote
+         if (accessible->role() == QAccessible::BlockQuote)
+             *pRetVal = QComVariant{ tr("blockquote") }.release();
++        else if (accessible->role() == QAccessible::Equation)
++            *pRetVal = QComVariant{ tr("math") }.release();
+         break;
+     case UIA_NamePropertyId: {
+         QString name = accessible->text(QAccessible::Name);
