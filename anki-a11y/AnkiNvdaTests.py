@@ -457,6 +457,7 @@ def _speech_probe(kind):
         # Align NVDA's navigator object with the actual focused math target,
         # then dump Developer Info. This records the concrete MSAA/IA2 role
         # and attributes Qt WebEngine exposed, instead of inferring from DOM.
+        spy = NvdaLib.getSpyLib()
         nav_speech = press(f"{kind}: move navigator to focused math", "NVDA+numpadMinus", .55)
         spy.dump_speech_to_log()
         robot.sleep(".4 seconds")
