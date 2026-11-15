@@ -1,38 +1,28 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-Subject: [PATCH] UIA: expose standard MathML custom-property objects as math
-
-NVDA already registers Microsoft Word's MathML UIA custom property. Chromium
-uses the same property GUID for web math. Reuse that transport generically
-when a UIA provider exposes a localized control type of "math".
----
- source/NVDAObjects/UIA/__init__.py | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
 diff --git a/source/NVDAObjects/UIA/__init__.py b/source/NVDAObjects/UIA/__init__.py
+index 730f956..64c9c9f 100644
 --- a/source/NVDAObjects/UIA/__init__.py
 +++ b/source/NVDAObjects/UIA/__init__.py
-@@
+@@ -1221,6 +1221,7 @@ def _prefetchUIACacheForPropertyIDs(self, IDs: typing.Collection[int]) -> None:
  	def findOverlayClasses(self, clsList):
  		UIAControlType = self.UIAElement.cachedControlType
  		UIAClassName = self.UIAElement.cachedClassName
 +		UIALocalizedControlType = self.UIAElement.cachedLocalizedControlType or ""
-@@
+ 		# #11445: to avoid COM errors, do not fetch cached UIA Automation Id from the underlying element.
+ 		UIAAutomationId = self.UIAAutomationId
+ 		if (
+@@ -1362,6 +1363,8 @@ def findOverlayClasses(self, clsList):
+ 			clsList.insert(0, DevExpressXtraRichEdit)
  		if UIAControlType == UIAHandler.UIA_ProgressBarControlTypeId:
  			clsList.insert(0, ProgressBar)
-+		# Microsoft Word and Chromium expose structured mathematics through
-+		# the same registered MathML UIA custom property. Allow other UIA
-+		# providers (for example Qt WebEngine) to use that interoperable
-+		# transport without needing an application-specific overlay.
 +		if UIALocalizedControlType.casefold() == "math":
 +			clsList.insert(0, UIAMath)
-@@
- class UIColumnHeader(UIA):
-@@
- 	def _get_description(self):
-@@
- 		return " ".join([x for x in (description, itemStatus) if x and not x.isspace()])
-+
-+
+ 		if UIAClassName == "ControlPanelLink":
+ 			clsList.append(ControlPanelLink)
+ 		if UIAClassName == "UIColumnHeader":
+@@ -2662,6 +2665,21 @@ def _get_description(self) -> str | None:
+ 		return description if description != name else None
+ 
+ 
 +class UIAMath(UIA):
 +	"""UIA mathematical object exposing the shared Word/Chromium MathML property."""
 +
@@ -46,3 +36,8 @@ diff --git a/source/NVDAObjects/UIA/__init__.py b/source/NVDAObjects/UIA/__init_
 +		if self.mathMl:
 +			return controlTypes.Role.MATH
 +		return super().role
++
++
+ class UIColumnHeader(UIA):
+ 	def _get_description(self):
+ 		description = self.UIAHelpText
