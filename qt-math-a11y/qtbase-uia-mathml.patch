@@ -2,12 +2,11 @@ diff --git a/src/gui/accessible/qaccessible_base.h b/src/gui/accessible/qaccessi
 index 04efeddf..34031c40 100644
 --- a/src/gui/accessible/qaccessible_base.h
 +++ b/src/gui/accessible/qaccessible_base.h
-@@ -382,6 +382,7 @@ public:
-         Custom,
+@@ -383,6 +383,7 @@ public:
          Level,
          Locale,
-+        MathML,
          Orientation,
++        MathML,
      };
      Q_ENUM(Attribute)
 
