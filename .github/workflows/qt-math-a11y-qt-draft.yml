@@ -44,51 +44,47 @@ jobs:
           p=Path("qtbase/src/plugins/platforms/windows/uiautomation/qwindowsuiamainprovider.cpp")
           s=p.read_text(encoding="utf-8")
 
-          a="using namespace QWindowsUiAutomation;\n"
-          helper=r"""using namespace QWindowsUiAutomation;
-
-namespace {
-
-PROPERTYID mathMlPropertyId()
-{
-    static const PROPERTYID id = [] {
-        ComPtr<IUIAutomationRegistrar> registrar;
-        if (FAILED(CoCreateInstance(CLSID_CUIAutomationRegistrar, nullptr, CLSCTX_INPROC_SERVER,
-                                    IID_PPV_ARGS(&registrar))))
-            return PROPERTYID{};
-
-        static const GUID mathMlGuid = {
-            0xfa170ab3, 0x3229, 0x4e7c, { 0x82, 0x7f, 0xdd, 0x05, 0xee, 0x04, 0x81, 0xd9 }
-        };
-        UIAutomationPropertyInfo info = { mathMlGuid, L"MathML", UIAutomationType_String };
-        PROPERTYID propertyId = 0;
-        if (FAILED(registrar->RegisterProperty(&info, &propertyId)))
-            return PROPERTYID{};
-        return propertyId;
-    }();
-    return id;
-}
-
-} // unnamed namespace
-"""
+          a="using namespace QWindowsUiAutomation;\\n"
+          helper=(
+              "using namespace QWindowsUiAutomation;\\n\\n"
+              "namespace {\\n\\n"
+              "PROPERTYID mathMlPropertyId()\\n"
+              "{\\n"
+              "    static const PROPERTYID id = [] {\\n"
+              "        ComPtr<IUIAutomationRegistrar> registrar;\\n"
+              "        if (FAILED(CoCreateInstance(CLSID_CUIAutomationRegistrar, nullptr, CLSCTX_INPROC_SERVER,\\n"
+              "                                    IID_PPV_ARGS(&registrar))))\\n"
+              "            return PROPERTYID{};\\n\\n"
+              "        static const GUID mathMlGuid = {\\n"
+              "            0xfa170ab3, 0x3229, 0x4e7c, { 0x82, 0x7f, 0xdd, 0x05, 0xee, 0x04, 0x81, 0xd9 }\\n"
+              "        };\\n"
+              "        UIAutomationPropertyInfo info = { mathMlGuid, L\"MathML\", UIAutomationType_String };\\n"
+              "        PROPERTYID propertyId = 0;\\n"
+              "        if (FAILED(registrar->RegisterProperty(&info, &propertyId)))\\n"
+              "            return PROPERTYID{};\\n"
+              "        return propertyId;\\n"
+              "    }();\\n"
+              "    return id;\\n"
+              "}\\n\\n"
+              "} // unnamed namespace\\n"
+          )
           assert s.count(a)==1
           s=s.replace(a,helper,1)
 
-          a="    bool topLevelWindow = accessible->parent() && (accessible->parent()->role() == QAccessible::Application);\n\n    switch (idProp) {\n"
-          b=r"""    bool topLevelWindow = accessible->parent() && (accessible->parent()->role() == QAccessible::Application);
-
-    const PROPERTYID mathPropertyId = mathMlPropertyId();
-    if (mathPropertyId && idProp == mathPropertyId) {
-        if (QAccessibleAttributesInterface *attributesIface = accessible->attributesInterface()) {
-            const QVariant mathMl = attributesIface->attributeValue(QAccessible::Attribute::MathML);
-            if (mathMl.isValid())
-                *pRetVal = QComVariant{ mathMl.toString() }.release();
-        }
-        return S_OK;
-    }
-
-    switch (idProp) {
-"""
+          a="    bool topLevelWindow = accessible->parent() && (accessible->parent()->role() == QAccessible::Application);\\n\\n    switch (idProp) {\\n"
+          b=(
+              "    bool topLevelWindow = accessible->parent() && (accessible->parent()->role() == QAccessible::Application);\\n\\n"
+              "    const PROPERTYID mathPropertyId = mathMlPropertyId();\\n"
+              "    if (mathPropertyId && idProp == mathPropertyId) {\\n"
+              "        if (QAccessibleAttributesInterface *attributesIface = accessible->attributesInterface()) {\\n"
+              "            const QVariant mathMl = attributesIface->attributeValue(QAccessible::Attribute::MathML);\\n"
+              "            if (mathMl.isValid())\\n"
+              "                *pRetVal = QComVariant{ mathMl.toString() }.release();\\n"
+              "        }\\n"
+              "        return S_OK;\\n"
+              "    }\\n\\n"
+              "    switch (idProp) {\\n"
+          )
           assert s.count(a)==1
           s=s.replace(a,b,1)
 
