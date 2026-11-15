@@ -33,15 +33,17 @@ matrices and nested expressions must remain MathML.
 
 Qt side:
 - Preserve QAccessible::Equation.
-- Publish a machine-readable math identity on Windows, rather than only
-  UIA_CustomControlTypeId with no ARIA role.
-- Provide structured MathML through a non-user-facing accessibility property.
-  A dedicated Qt accessibility attribute would be cleaner than placing MathML
-  in Name/Description. A temporary Custom attribute can be used for experiments.
+- Expose the invariant UIA_AriaRole value "math" for Equation. Do not use a
+  localized control-type string as the only machine-readable selector.
+- Transport structured MathML through a dedicated QAccessible attribute and
+  the shared Word/Chromium custom UIA MathML property GUID
+  {FA170AB3-3229-4E7C-827F-DD05EE0481D9}.
+- Keep Name/Description free of raw MathML in production.
 
 NVDA side:
-- Recognize the Qt/UIA math identity as controlTypes.Role.MATH.
-- Retrieve MathML from the agreed structured property.
+- Recognize the invariant UIA ARIA role "math" as the candidate math object.
+- Retrieve MathML from NVDA's already-registered Word MathML custom property.
+- Expose controlTypes.Role.MATH only when MathML is actually retrievable.
 - Reuse the existing MathCAT path; do not create a separate mathematics
   navigation implementation.
 
@@ -62,8 +64,11 @@ is healthy.
 ## Diagnostic bridge
 
 The audit branch includes a test-only bridge that transfers the exact MathML
-through UIA FullDescription and overlays that marked custom object as
-Role.MATH inside NVDA's system-test plugin. This is deliberately not proposed
-as production behavior. Its only purpose is causal proof: if MathCAT works
-inside Anki with that bridge, the rendering/content is valid and the missing
-piece is the Qt/UIA transport layer.
+through a marked UIA description and overlays that marked object as Role.MATH
+with a real mathMl property inside NVDA's system-test plugin. This is
+deliberately not proposed as production behavior.
+
+The causal test now passes: real NVDA enters MathCAT inside Anki and navigates
+the fraction, exponent and equation fixtures structurally. That confirms that
+the rendering/content is valid and that restoring the missing Qt/UIA semantic
+transport is sufficient.
