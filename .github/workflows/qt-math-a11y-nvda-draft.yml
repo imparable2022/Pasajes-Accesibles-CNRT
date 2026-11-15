@@ -1,0 +1,73 @@
+name: Validate generic NVDA UIA MathML draft
+on:
+  push:
+    branches: [audit/anki-a11y-generalized-2026-11]
+    paths:
+      - "qt-math-a11y/**"
+      - ".github/workflows/qt-math-a11y-nvda-draft.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout NVDA 2026.3.1
+        uses: actions/checkout@v4
+        with:
+          repository: nvaccess/nvda
+          ref: release-2026.3.1
+          path: nvda
+          persist-credentials: false
+
+      - name: Apply generic UIA math transformation
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("nvda/source/NVDAObjects/UIA/__init__.py")
+          s = path.read_text(encoding="utf-8")
+
+          a = "\t\tUIAClassName = self.UIAElement.cachedClassName\n"
+          b = a + "\t\tUIALocalizedControlType = self.UIAElement.cachedLocalizedControlType or \"\"\n"
+          assert s.count(a) == 1
+          s = s.replace(a, b, 1)
+
+          a = "\t\tif UIAControlType == UIAHandler.UIA_ProgressBarControlTypeId:\n\t\t\tclsList.insert(0, ProgressBar)\n"
+          b = a + (
+              "\t\tif UIALocalizedControlType.casefold() == \"math\":\n"
+              "\t\t\tclsList.insert(0, UIAMath)\n"
+          )
+          assert s.count(a) == 1
+          s = s.replace(a, b, 1)
+
+          anchor = "class UIColumnHeader(UIA):\n"
+          math_class = '''class UIAMath(UIA):
+          \t"""UIA mathematical object exposing the shared Word/Chromium MathML property."""
+
+          \tdef _get_mathMl(self):
+          \t\ttry:
+          \t\t\treturn self._getUIACacheablePropertyValue(self._UIACustomProps.word_mathml.id)
+          \t\texcept COMError:
+          \t\t\treturn None
+
+          \tdef _get_role(self):
+          \t\tif self.mathMl:
+          \t\t\treturn controlTypes.Role.MATH
+          \t\treturn super().role
+
+
+          '''
+          assert s.count(anchor) == 1
+          s = s.replace(anchor, math_class + anchor, 1)
+          compile(s, str(path), "exec")
+          path.write_text(s, encoding="utf-8", newline="\n")
+
+      - name: Validate diff
+        working-directory: nvda
+        shell: bash
+        run: |
+          git diff --check
+          python -m py_compile source/NVDAObjects/UIA/__init__.py
+          git diff -- source/NVDAObjects/UIA/__init__.py
