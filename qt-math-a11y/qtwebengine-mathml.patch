@@ -1,0 +1,60 @@
+diff --git a/src/core/browser_accessibility_qt.cpp b/src/core/browser_accessibility_qt.cpp
+index 31ea541..7583352 100644
+--- a/src/core/browser_accessibility_qt.cpp
++++ b/src/core/browser_accessibility_qt.cpp
+@@ -50,6 +50,7 @@ class BrowserAccessibilityInterface
+     , public QAccessibleValueInterface
+     , public QAccessibleTableInterface
+     , public QAccessibleTableCellInterface
++    , public QAccessibleAttributesInterface
+ {
+ public:
+     BrowserAccessibilityInterface(BrowserAccessibilityQt *chromiumInterface);
+@@ -73,6 +74,8 @@ public:
+     // properties and state
+     QString text(QAccessible::Text t) const override;
+     void setText(QAccessible::Text t, const QString &text) override;
++    QList<QAccessible::Attribute> attributeKeys() const override;
++    QVariant attributeValue(QAccessible::Attribute key) const override;
+     QRect rect() const override;
+     QAccessible::Role role() const override;
+     QAccessible::State state() const override;
+@@ -320,6 +323,10 @@ void *BrowserAccessibilityInterface::interface_cast(QAccessible::InterfaceType t
+         if (!actionNames().isEmpty())
+             return static_cast<QAccessibleActionInterface*>(this);
+         break;
++    case QAccessible::AttributesInterface:
++        if (!attributeKeys().isEmpty())
++            return static_cast<QAccessibleAttributesInterface*>(this);
++        break;
+     case QAccessible::TextInterface:
+         if (q->HasState(ax::mojom::State::kEditable))
+             return static_cast<QAccessibleTextInterface*>(this);
+@@ -428,6 +435,27 @@ void BrowserAccessibilityInterface::setText(QAccessible::Text t, const QString &
+ {
+ }
+ 
++QList<QAccessible::Attribute> BrowserAccessibilityInterface::attributeKeys() const
++{
++    if (role() == QAccessible::Equation
++        && q->HasStringAttribute(ax::mojom::StringAttribute::kMathContent))
++        return { QAccessible::Attribute::MathML };
++    return {};
++}
++
++QVariant BrowserAccessibilityInterface::attributeValue(QAccessible::Attribute key) const
++{
++    if (key != QAccessible::Attribute::MathML
++        || role() != QAccessible::Equation
++        || !q->HasStringAttribute(ax::mojom::StringAttribute::kMathContent))
++        return {};
++
++    const QString inner = toQt(q->GetStringAttribute(ax::mojom::StringAttribute::kMathContent));
++    if (inner.isEmpty())
++        return {};
++    return QStringLiteral("<math>") + inner + QStringLiteral("</math>");
++}
++
+ QRect BrowserAccessibilityInterface::rect() const
+ {
+     if (!q->manager() || !q->isReady()) // needed implicitly by GetScreenBoundsRect()
