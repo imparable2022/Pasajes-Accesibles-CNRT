@@ -106,7 +106,9 @@ def add_math_navigation(html, card, context):
     if not OPTIONS.get("experimental_mathml_focus", False):
         return html
     # Append after the normal reviewer body (and its existing hooks).
-    code = (MATH_FOCUS_JS\n        .replace("__DETACHED__", json.dumps(bool(OPTIONS.get("experimental_mathml_detached", False))))\n        .replace("__WRAPPER__", json.dumps(bool(OPTIONS.get("experimental_mathml_wrapper", False)))))
+    code = (MATH_FOCUS_JS
+        .replace("__DETACHED__", json.dumps(bool(OPTIONS.get("experimental_mathml_detached", False))))
+        .replace("__WRAPPER__", json.dumps(bool(OPTIONS.get("experimental_mathml_wrapper", False)))))
     return html + "<script>onShownHook.push(() => {\n" + code + "\n});</script>"
 
 def register_math_hooks():
