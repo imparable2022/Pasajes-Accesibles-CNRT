@@ -13,7 +13,7 @@ CLASS_ANCHOR = "class SystemTestSpyServer(globalPluginHandler.GlobalPlugin):"
 CLASS_TERMINATE_ANCHOR = """\n\tdef terminate(self):
 \t\tlog.debug("Terminating the SystemTestSpyServer")"""
 
-BRIDGE_CLASS = r'''
+BRIDGE_CLASS = '''
 _ANKI_MATH_MARKER = "ANKI_MATHML:"
 
 
@@ -30,7 +30,7 @@ class _AnkiQtMathBridge:
 \t\treturn unquote(desc[len(_ANKI_MATH_MARKER):])
 '''
 
-METHOD = r'''
+METHOD = '''
 \tdef chooseNVDAObjectOverlayClasses(self, obj, clsList):
 \t\t# The marker only exists on the opt-in audit wrapper, so it is a safer
 \t\t# causal selector than relying on process environment propagation or
