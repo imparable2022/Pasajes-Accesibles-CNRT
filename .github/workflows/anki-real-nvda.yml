@@ -17,9 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { rich_focus: false, math_variant: native }
-          - { rich_focus: true, math_variant: native }
-          - { rich_focus: true, math_variant: detached }
+          # Temporary causal run: validate the Qt→UIA MathML bridge first.
           - { rich_focus: true, math_variant: wrapper }
     runs-on: windows-2025
     timeout-minutes: 55
