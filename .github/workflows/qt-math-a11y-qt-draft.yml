@@ -14,6 +14,12 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout audit patches
+        uses: actions/checkout@v4
+        with:
+          path: audit
+          persist-credentials: false
+
       - name: Checkout Qt Base 6.11.2
         uses: actions/checkout@v4
         with:
@@ -30,126 +36,20 @@ jobs:
           path: qtwebengine
           persist-credentials: false
 
-      - name: Add MathML accessibility attribute to Qt Base source
-        shell: python
-        run: |
-          from pathlib import Path
-          p=Path("qtbase/src/gui/accessible/qaccessible_base.h")
-          s=p.read_text(encoding="utf-8")
-          a="        Locale,\n        Orientation,\n"
-          b="        Locale,\n        MathML,\n        Orientation,\n"
-          assert s.count(a)==1
-          p.write_text(s.replace(a,b,1),encoding="utf-8",newline="\n")
-
-          p=Path("qtbase/src/plugins/platforms/windows/uiautomation/qwindowsuiamainprovider.cpp")
-          s=p.read_text(encoding="utf-8")
-
-          a="using namespace QWindowsUiAutomation;\n"
-          helper=(
-              "using namespace QWindowsUiAutomation;\n\n"
-              "namespace {\n\n"
-              "PROPERTYID mathMlPropertyId()\n"
-              "{\n"
-              "    static const PROPERTYID id = [] {\n"
-              "        ComPtr<IUIAutomationRegistrar> registrar;\n"
-              "        if (FAILED(CoCreateInstance(CLSID_CUIAutomationRegistrar, nullptr, CLSCTX_INPROC_SERVER,\n"
-              "                                    IID_PPV_ARGS(&registrar))))\n"
-              "            return PROPERTYID{};\n\n"
-              "        static const GUID mathMlGuid = {\n"
-              "            0xfa170ab3, 0x3229, 0x4e7c, { 0x82, 0x7f, 0xdd, 0x05, 0xee, 0x04, 0x81, 0xd9 }\n"
-              "        };\n"
-              "        UIAutomationPropertyInfo info = { mathMlGuid, L\"MathML\", UIAutomationType_String };\n"
-              "        PROPERTYID propertyId = 0;\n"
-              "        if (FAILED(registrar->RegisterProperty(&info, &propertyId)))\n"
-              "            return PROPERTYID{};\n"
-              "        return propertyId;\n"
-              "    }();\n"
-              "    return id;\n"
-              "}\n\n"
-              "} // unnamed namespace\n"
-          )
-          assert s.count(a)==1
-          s=s.replace(a,helper,1)
-
-          a="    bool topLevelWindow = accessible->parent() && (accessible->parent()->role() == QAccessible::Application);\n\n    switch (idProp) {\n"
-          b=(
-              "    bool topLevelWindow = accessible->parent() && (accessible->parent()->role() == QAccessible::Application);\n\n"
-              "    const PROPERTYID mathPropertyId = mathMlPropertyId();\n"
-              "    if (mathPropertyId && idProp == mathPropertyId) {\n"
-              "        if (QAccessibleAttributesInterface *attributesIface = accessible->attributesInterface()) {\n"
-              "            const QVariant mathMl = attributesIface->attributeValue(QAccessible::Attribute::MathML);\n"
-              "            if (mathMl.isValid())\n"
-              "                *pRetVal = QComVariant{ mathMl.toString() }.release();\n"
-              "        }\n"
-              "        return S_OK;\n"
-              "    }\n\n"
-              "    switch (idProp) {\n"
-          )
-          assert s.count(a)==1
-          s=s.replace(a,b,1)
-
-          a='    case UIA_LocalizedControlTypePropertyId:\n        // see Core Accessibility API Mappings spec:\n        // https://www.w3.org/TR/core-aam-1.2/#role-map-blockquote\n        if (accessible->role() == QAccessible::BlockQuote)\n            *pRetVal = QComVariant{ tr("blockquote") }.release();\n        break;\n'
-          b='    case UIA_LocalizedControlTypePropertyId:\n        // see Core Accessibility API Mappings spec:\n        // https://www.w3.org/TR/core-aam-1.2/#role-map-blockquote\n        if (accessible->role() == QAccessible::BlockQuote)\n            *pRetVal = QComVariant{ tr("blockquote") }.release();\n        else if (accessible->role() == QAccessible::Equation)\n            *pRetVal = QComVariant{ tr("math") }.release();\n        break;\n'
-          assert s.count(a)==1
-          p.write_text(s.replace(a,b,1),encoding="utf-8",newline="\n")
-
-      - name: Add Chromium MathML transport to Qt WebEngine source
-        shell: python
-        run: |
-          from pathlib import Path
-          p=Path("qtwebengine/src/core/browser_accessibility_qt.cpp")
-          s=p.read_text(encoding="utf-8")
-
-          a="    , public QAccessibleTableCellInterface\n{"
-          b="    , public QAccessibleTableCellInterface\n    , public QAccessibleAttributesInterface\n{"
-          assert s.count(a)==1
-          s=s.replace(a,b,1)
-
-          a="    void setText(QAccessible::Text t, const QString &text) override;\n    QRect rect() const override;"
-          b=("    void setText(QAccessible::Text t, const QString &text) override;\n"
-             "    QList<QAccessible::Attribute> attributeKeys() const override;\n"
-             "    QVariant attributeValue(QAccessible::Attribute key) const override;\n"
-             "    QRect rect() const override;")
-          assert s.count(a)==1
-          s=s.replace(a,b,1)
-
-          a="    case QAccessible::ActionInterface:\n        if (!actionNames().isEmpty())\n            return static_cast<QAccessibleActionInterface*>(this);\n        break;\n"
-          b=a+("    case QAccessible::AttributesInterface:\n"
-               "        if (!attributeKeys().isEmpty())\n"
-               "            return static_cast<QAccessibleAttributesInterface*>(this);\n"
-               "        break;\n")
-          assert s.count(a)==1
-          s=s.replace(a,b,1)
-
-          a="void BrowserAccessibilityInterface::setText(QAccessible::Text t, const QString &text)\n{\n}\n\n"
-          b=a+'''QList<QAccessible::Attribute> BrowserAccessibilityInterface::attributeKeys() const
-          {
-              if (role() == QAccessible::Equation
-                  && q->HasStringAttribute(ax::mojom::StringAttribute::kMathContent))
-                  return { QAccessible::Attribute::MathML };
-              return {};
-          }
-
-          QVariant BrowserAccessibilityInterface::attributeValue(QAccessible::Attribute key) const
-          {
-              if (key != QAccessible::Attribute::MathML
-                  || role() != QAccessible::Equation
-                  || !q->HasStringAttribute(ax::mojom::StringAttribute::kMathContent))
-                  return {};
-
-              const QString inner = toQt(q->GetStringAttribute(ax::mojom::StringAttribute::kMathContent));
-              if (inner.isEmpty())
-                  return {};
-              return QStringLiteral("<math>") + inner + QStringLiteral("</math>");
-          }
-
-          '''
-          assert s.count(a)==1
-          s=s.replace(a,b,1)
-          p.write_text(s,encoding="utf-8",newline="\n")
-
-      - name: Validate source diffs
+      - name: Apply saved Qt Base patch
+        working-directory: qtbase
         shell: bash
         run: |
-          (cd qtbase && git diff --check && git diff -- src/gui/accessible/qaccessible_base.h src/plugins/platforms/windows/uiautomation/qwindowsuiamainprovider.cpp)
-          (cd qtwebengine && git diff --check && git diff -- src/core/browser_accessibility_qt.cpp)
+          git apply --check ../audit/qt-math-a11y/qtbase-uia-mathml.patch
+          git apply ../audit/qt-math-a11y/qtbase-uia-mathml.patch
+          git diff --check
+          git diff -- src/gui/accessible/qaccessible_base.h src/plugins/platforms/windows/uiautomation/qwindowsuiamainprovider.cpp
+
+      - name: Apply saved Qt WebEngine patch
+        working-directory: qtwebengine
+        shell: bash
+        run: |
+          git apply --check ../audit/qt-math-a11y/qtwebengine-mathml.patch
+          git apply ../audit/qt-math-a11y/qtwebengine-mathml.patch
+          git diff --check
+          git diff -- src/core/browser_accessibility_qt.cpp
