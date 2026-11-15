@@ -20,6 +20,7 @@ jobs:
           - { rich_focus: false, math_variant: native }
           - { rich_focus: true, math_variant: native }
           - { rich_focus: true, math_variant: detached }
+          - { rich_focus: true, math_variant: wrapper }
     runs-on: windows-2025
     timeout-minutes: 55
     steps:
