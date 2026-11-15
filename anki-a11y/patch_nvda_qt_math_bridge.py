@@ -21,7 +21,7 @@ class _AnkiQtMathBridge:
 
 	def _get_mathMl(self):
 		from urllib.parse import unquote
-		desc = self.UIAFullDescription or ""
+		desc = self.description or ""
 		if not desc.startswith(_ANKI_MATH_MARKER):
 			raise LookupError("No Anki MathML marker")
 		return unquote(desc[len(_ANKI_MATH_MARKER):])
@@ -29,23 +29,20 @@ class _AnkiQtMathBridge:
 
 METHOD = r'''
 	def chooseNVDAObjectOverlayClasses(self, obj, clsList):
-		# This experiment must never affect ordinary NVDA system tests.
-		if os.environ.get("ANKI_A11Y_MATH_VARIANT") != "wrapper":
-			return
+		# The marker only exists on the opt-in audit wrapper, so it is a safer
+		# causal selector than relying on process environment propagation or
+		# a particular UIA control type.
 		try:
 			import controlTypes
-			import UIAHandler
 			from NVDAObjects.UIA import UIA
 			if not isinstance(obj, UIA):
 				return
-			if obj.UIAElement.cachedControlType != UIAHandler.UIA_CustomControlTypeId:
-				return
-			desc = obj.UIAFullDescription or ""
+			desc = obj.description or ""
 			if not desc.startswith(_ANKI_MATH_MARKER):
 				return
 			_AnkiQtMathBridge.role = controlTypes.Role.MATH
 			clsList.insert(0, _AnkiQtMathBridge)
-			log.info("ANKI_QT_MATH_BRIDGE applied to marked UIA Custom object")
+			log.warning("ANKI_QT_MATH_BRIDGE applied to marked Qt UIA object")
 		except Exception:
 			log.error("ANKI_QT_MATH_BRIDGE overlay selection failed", exc_info=True)
 '''
