@@ -23,12 +23,23 @@ class _AnkiQtMathBridge:
 
 \trole = None  # replaced after imports below
 
-\tdef _get_mathMl(self):
+\tdef _decodeMathMl(self):
 \t\tfrom urllib.parse import unquote
 \t\tdesc = self.description or ""
 \t\tif not desc.startswith(_ANKI_MATH_MARKER):
 \t\t\traise LookupError("No Anki MathML marker")
 \t\treturn unquote(desc[len(_ANKI_MATH_MARKER):])
+
+\t@property
+\tdef mathMl(self):
+\t\t# NVDAObject.mathMl is an AutoProperty descriptor bound to the base
+\t\t# getter when that class is created. A plain overlay mixin supplying
+\t\t# only _get_mathMl does not replace that inherited descriptor.
+\t\treturn self._decodeMathMl()
+
+\tdef _get_mathMl(self):
+\t\t# Keep the conventional getter for diagnostics/direct callers too.
+\t\treturn self._decodeMathMl()
 '''
 
 OVERLAY_METHOD = '''
