@@ -50,8 +50,8 @@ MATH_FOCUS_JS = r"""
     }
     if (!math) continue;
     if (math.localName !== "math") continue;
-    // Controlled Qt WebEngine experiment: clone the unmodified MathML
-    // outside MathJax's assistive wrapper, keeping its native structure.
+    // Controlled Qt WebEngine experiments. Neither variant changes the
+    // visible MathJax expression or converts it to a text label.
     if (__DETACHED__) {
       const clone = math.cloneNode(true);
       const host = document.createElement("span");
@@ -62,14 +62,32 @@ MATH_FOCUS_JS = r"""
       visual.after(host);
       math = clone;
       report.injectedMath++;
+    } else if (__WRAPPER__) {
+      const sourceMath = math.cloneNode(true);
+      sourceMath.removeAttribute("role");
+      sourceMath.removeAttribute("tabindex");
+      const host = document.createElement("span");
+      host.className = "anki-a11y-role-math-test";
+      host.style.cssText = "position:absolute;width:1px;height:1px;" +
+        "overflow:hidden;clip-path:inset(50%);white-space:nowrap;";
+      host.setAttribute("role", "math");
+      host.setAttribute("tabindex", "0");
+      // NVDA's IA2 web math support can retrieve structured MathML from
+      // data-mathml on an HTML element with role=math when the browser
+      // exposes that element as the equation accessibility role.
+      host.setAttribute("data-mathml", math.outerHTML);
+      host.appendChild(sourceMath);
+      visual.after(host);
+      math = host;
+      report.injectedMath++;
     }
-    // Qt WebEngine exposes the native MathML as role "unknown" to NVDA.
-    // Try an explicit ARIA math role without linearizing or duplicating
-    // the equation. This is a controlled experiment, not an upstream fix.
-    math.setAttribute("role", "math");
-    math.setAttribute("tabindex", "0");
+    // Native/detached MathML receives an explicit ARIA math role too.
+    if (math.localName === "math") {
+      math.setAttribute("role", "math");
+      math.setAttribute("tabindex", "0");
+    }
     results.push(math);
-    report.sample = math.outerHTML.slice(0,1200);
+    report.sample = math.outerHTML.slice(0,1600);
   }
   if (results.length > 0) {
     // Move focus only in the explicit opt-in mode. Ordinary keyboard users
@@ -88,7 +106,7 @@ def add_math_navigation(html, card, context):
     if not OPTIONS.get("experimental_mathml_focus", False):
         return html
     # Append after the normal reviewer body (and its existing hooks).
-    code = MATH_FOCUS_JS.replace("__DETACHED__", json.dumps(bool(OPTIONS.get("experimental_mathml_detached", False))))
+    code = (MATH_FOCUS_JS\n        .replace("__DETACHED__", json.dumps(bool(OPTIONS.get("experimental_mathml_detached", False))))\n        .replace("__WRAPPER__", json.dumps(bool(OPTIONS.get("experimental_mathml_wrapper", False)))))
     return html + "<script>onShownHook.push(() => {\n" + code + "\n});</script>"
 
 def register_math_hooks():
