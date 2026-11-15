@@ -53,7 +53,7 @@ def verify_mathcat_in_chrome():
         mathcat = (not errors and
                    "not math" not in entry.casefold() and
                    any(token in after_entry for token in
-                       ("numerator","denominator","fraction","power","squared","cubed","equal")))
+                       ("numerator","denominator","fraction","half","fourth","quarter","power","squared","cubed","equal")))
         records.append({"kind":kind,"entry":entry,"mathcat_usable":mathcat,"utterances":utterances})
         output.write_text(json.dumps(records,ensure_ascii=False,indent=2),encoding="utf-8")
         robot.log(f"Chrome MathCAT {kind}: {records[-1]}")
