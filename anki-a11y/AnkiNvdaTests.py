@@ -453,9 +453,15 @@ def _speech_probe(kind):
     """
     samples = []
     if kind.startswith("Math"):
+        # Align NVDA's navigator object with the actual focused math target,
+        # then dump Developer Info. This records the concrete MSAA/IA2 role
+        # and attributes Qt WebEngine exposed, instead of inferring from DOM.
+        nav_speech = press(f"{kind}: move navigator to focused math", "NVDA+numpadMinus", .55)
+        spy.dump_speech_to_log()
+        robot.sleep(".4 seconds")
+        note("MATH_FOCUSED_ACCESSIBILITY_OBJECT", kind=kind, navigator_speech=nav_speech[:900])
         # Perform the user-facing MathCAT command while our experimental
-        # MathML element still has keyboard focus. The original experiment
-        # only tried NVDA+Alt+M *after* moving the review cursor away.
+        # MathML target still has keyboard focus and the navigator is aligned.
         entered_speech = press(f"{kind}: enter MathCAT directly", "NVDA+alt+m", 1.1)
         spoken_segments = [entered_speech]
         # Space is Anki's Show Answer shortcut when NOT in MathCAT!
