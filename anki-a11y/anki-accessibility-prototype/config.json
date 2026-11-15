@@ -6,6 +6,7 @@
   "label_editor_fields": true,
   "focus_noninteractive_rich_cards": false,
   "experimental_mathml_focus": false,
-  "experimental_mathml_detached": false,\n  "experimental_mathml_wrapper": false,
+  "experimental_mathml_detached": false,
+  "experimental_mathml_wrapper": false,
   "enable_audio_replay_button": false
 }
