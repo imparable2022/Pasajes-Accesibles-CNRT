@@ -74,7 +74,6 @@ index 6bd3c939..32558f6b 100644
          break;
      case UIA_AriaPropertiesPropertyId:
          setAriaProperties(accessible, pRetVal);
-
 @@ -655,6 +691,8 @@ HRESULT QWindowsUiaMainProvider::GetPropertyValue(PROPERTYID idProp, VARIANT *pR
          // https://www.w3.org/TR/core-aam-1.2/#role-map-blockquote
          if (accessible->role() == QAccessible::BlockQuote)
