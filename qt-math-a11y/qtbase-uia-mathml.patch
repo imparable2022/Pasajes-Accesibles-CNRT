@@ -62,7 +62,20 @@ index 6bd3c939..32558f6b 100644
      switch (idProp) {
      case UIA_ProcessIdPropertyId:
          // PID
-@@ -655,6 +689,8 @@ HRESULT QWindowsUiaMainProvider::GetPropertyValue(PROPERTYID idProp, VARIANT *pR
+@@ -537,10 +571,12 @@ HRESULT QWindowsUiaMainProvider::GetPropertyValue(PROPERTYID idProp, VARIANT *pR
+         // Accelerator key.
+         *pRetVal = QComVariant{ accessible->text(QAccessible::Accelerator) }.release();
+         break;
+     case UIA_AriaRolePropertyId:
+         if (accessible->role() == QAccessible::Heading)
+             *pRetVal = QComVariant{ QStringLiteral("heading") }.release();
++        else if (accessible->role() == QAccessible::Equation)
++            *pRetVal = QComVariant{ QStringLiteral("math") }.release();
+         break;
+     case UIA_AriaPropertiesPropertyId:
+         setAriaProperties(accessible, pRetVal);
+
+@@ -655,6 +691,8 @@ HRESULT QWindowsUiaMainProvider::GetPropertyValue(PROPERTYID idProp, VARIANT *pR
          // https://www.w3.org/TR/core-aam-1.2/#role-map-blockquote
          if (accessible->role() == QAccessible::BlockQuote)
              *pRetVal = QComVariant{ tr("blockquote") }.release();
