@@ -114,6 +114,12 @@ jobs:
           python anki-a11y/patch_nvda_spy_rate.py nvda/tests/system/libraries/SystemTestSpy/speechSpySynthDriver.py
           if ($LASTEXITCODE -ne 0) { throw "Cannot patch test synthesizer rate" }
 
+      - name: Install test-only Qt MathML bridge in NVDA system-test plugin
+        shell: pwsh
+        run: |
+          python anki-a11y/patch_nvda_qt_math_bridge.py nvda/tests/system/libraries/SystemTestSpy/speechSpyGlobalPlugin.py
+          if ($LASTEXITCODE -ne 0) { throw "Cannot patch NVDA Qt MathML diagnostic bridge" }
+
       - name: Register Anki tests in NVDA Robot test harness
         shell: pwsh
         run: |
