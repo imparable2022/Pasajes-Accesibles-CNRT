@@ -6,7 +6,7 @@ index 730f956..64c9c9f 100644
  	def findOverlayClasses(self, clsList):
  		UIAControlType = self.UIAElement.cachedControlType
  		UIAClassName = self.UIAElement.cachedClassName
-+		UIALocalizedControlType = self.UIAElement.cachedLocalizedControlType or ""
++		UIAAriaRole = self._getUIACacheablePropertyValue(UIAHandler.UIA_AriaRolePropertyId) or ""
  		# #11445: to avoid COM errors, do not fetch cached UIA Automation Id from the underlying element.
  		UIAAutomationId = self.UIAAutomationId
  		if (
@@ -14,7 +14,7 @@ index 730f956..64c9c9f 100644
  			clsList.insert(0, DevExpressXtraRichEdit)
  		if UIAControlType == UIAHandler.UIA_ProgressBarControlTypeId:
  			clsList.insert(0, ProgressBar)
-+		if UIALocalizedControlType.casefold() == "math":
++		if "math" in UIAAriaRole.casefold().split():
 +			clsList.insert(0, UIAMath)
  		if UIAClassName == "ControlPanelLink":
  			clsList.append(ControlPanelLink)
