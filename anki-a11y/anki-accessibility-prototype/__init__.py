@@ -27,7 +27,8 @@ DEFAULTS = {
     "max_auto_speech_characters": 800,
     "label_editor_fields": True,
     "experimental_mathml_focus": False,
-    "experimental_mathml_detached": False,\n    "experimental_mathml_wrapper": False,
+    "experimental_mathml_detached": False,
+    "experimental_mathml_wrapper": False,
     "enable_audio_replay_button": False,
     "focus_noninteractive_rich_cards": False,
 }
