@@ -132,7 +132,8 @@ def start_anki():
                 "label_editor_fields": True,
                 "focus_noninteractive_rich_cards": rich_focus_enabled,
                 "experimental_mathml_focus": rich_focus_enabled,
-                "experimental_mathml_detached": os.environ.get("ANKI_A11Y_MATH_VARIANT", "native") == "detached",\n                "experimental_mathml_wrapper": os.environ.get("ANKI_A11Y_MATH_VARIANT", "native") == "wrapper",
+                "experimental_mathml_detached": os.environ.get("ANKI_A11Y_MATH_VARIANT", "native") == "detached",
+                "experimental_mathml_wrapper": os.environ.get("ANKI_A11Y_MATH_VARIANT", "native") == "wrapper",
                 "enable_audio_replay_button": True}
     (target / "config.json").write_text(json.dumps(settings), encoding="utf-8")
     note("TEST_ADDON_INSTALLED", path=str(target), options=settings)
