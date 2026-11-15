@@ -72,9 +72,12 @@ MATH_FOCUS_JS = r"""
         "overflow:hidden;clip-path:inset(50%);white-space:nowrap;";
       host.setAttribute("role", "math");
       host.setAttribute("tabindex", "0");
-      // NVDA's IA2 web math support can retrieve structured MathML from
-      // data-mathml on an HTML element with role=math when the browser
-      // exposes that element as the equation accessibility role.
+      // Diagnostic transport marker. Qt exposes QAccessible::Description as
+      // UIA FullDescription on Windows, so a test-only NVDA overlay can prove
+      // whether restoring Role.MATH + the exact MathML is sufficient.
+      host.setAttribute("aria-description",
+        "ANKI_MATHML:" + encodeURIComponent(math.outerHTML));
+      // IA2 browsers can retrieve this directly; Qt/UIA currently cannot.
       host.setAttribute("data-mathml", math.outerHTML);
       host.appendChild(sourceMath);
       visual.after(host);
