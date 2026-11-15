@@ -62,7 +62,7 @@ index 6bd3c939..32558f6b 100644
      switch (idProp) {
      case UIA_ProcessIdPropertyId:
          // PID
-@@ -537,10 +571,12 @@ HRESULT QWindowsUiaMainProvider::GetPropertyValue(PROPERTYID idProp, VARIANT *pR
+@@ -537,9 +571,11 @@ HRESULT QWindowsUiaMainProvider::GetPropertyValue(PROPERTYID idProp, VARIANT *pR
          // Accelerator key.
          *pRetVal = QComVariant{ accessible->text(QAccessible::Accelerator) }.release();
          break;
