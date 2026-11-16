@@ -1,0 +1,206 @@
+name: Build patched Qt WebEngine 6.11.2 MathML transport
+
+on:
+  push:
+    branches: [audit/anki-a11y-generalized-2026-11]
+    paths:
+      - "qt-math-a11y/qtwebengine-mathml.patch"
+      - ".github/workflows/qt-math-a11y-webengine-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-webengine:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    env:
+      QT_VERSION: "6.11.2"
+      QT_ARCH: "win64_msvc2022_64"
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Activate MSVC x64 environment
+        shell: pwsh
+        run: |
+          $programFilesX86 = [Environment]::GetEnvironmentVariable("ProgramFiles(x86)")
+          $vswhere = Join-Path $programFilesX86 "Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere not found" }
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "Visual Studio C++ toolchain not found" }
+          $dev = Join-Path $vs "Common7\Tools\VsDevCmd.bat"
+          $command = '"' + $dev + '" -arch=x64 -host_arch=x64 && set'
+          $dump = cmd /s /c $command
+          foreach ($line in $dump) {
+            if ($line -match '^([^=]+)=(.*)$') {
+              "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+
+      - name: Install matching official Qt SDK and WebEngine package
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check "git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b"
+          $root = Join-Path $env:GITHUB_WORKSPACE "qt-sdk"
+          aqt install-qt -O $root windows desktop $env:QT_VERSION $env:QT_ARCH -m qtwebengine
+          if ($LASTEXITCODE -ne 0) { throw "Qt SDK install failed" }
+          $qt = Join-Path $root "$env:QT_VERSION\msvc2022_64"
+          if (-not (Test-Path (Join-Path $qt "bin\qt-configure-module.bat"))) {
+            throw "qt-configure-module.bat missing"
+          }
+          "QT_SDK=$qt" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$qt\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Install and verify Qt WebEngine parser tools
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check html5lib
+          choco install winflexbison3 gperf -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Chocolatey dependency install failed" }
+
+          $winFlex = (Get-Command win_flex.exe -ErrorAction Stop).Source
+          $winBison = (Get-Command win_bison.exe -ErrorAction Stop).Source
+          $gperf = (Get-Command gperf.exe -ErrorAction Stop).Source
+
+          & $winFlex --version
+          if ($LASTEXITCODE -ne 0) { throw "win_flex failed in its installed location" }
+          & $winBison --version
+          if ($LASTEXITCODE -ne 0) { throw "win_bison failed in its installed location" }
+          & $gperf --version
+          if ($LASTEXITCODE -ne 0) { throw "gperf failed" }
+          python -c "import html5lib; print('html5lib', html5lib.__version__)"
+
+          "WIN_FLEX=$winFlex" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "WIN_BISON=$winBison" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "GPERF_EXE=$gperf" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Report required toolchain versions
+        shell: pwsh
+        run: |
+          cmake --version
+          ninja --version
+          node --version
+          python --version
+          cl 2>&1 | Select-Object -First 3
+          & "$env:QT_SDK\bin\qmake.exe" -query QT_VERSION
+
+      - name: Add MathML accessibility attribute to matching Qt headers
+        shell: pwsh
+        run: |
+          $headers = @(Get-ChildItem "$env:QT_SDK\include" -Recurse -Filter qaccessible_base.h -File)
+          if (-not $headers) { throw "Installed qaccessible_base.h not found" }
+          foreach ($header in $headers) {
+            $text = Get-Content $header.FullName -Raw
+            if ($text -notmatch '\bMathML\b') {
+              $updated = $text -replace '(?m)^(\s*)Orientation,(\r?\n)', '$1Orientation,$2$1MathML,$2'
+              if ($updated -eq $text) { throw "Could not add MathML enum to $($header.FullName)" }
+              [IO.File]::WriteAllText($header.FullName, $updated, [Text.UTF8Encoding]::new($false))
+            }
+            Select-String -Path $header.FullName -Pattern "MathML" | ForEach-Object { Write-Host $_.Line }
+          }
+
+      - name: Enable long Git paths for Chromium
+        shell: pwsh
+        run: git config --global core.longpaths true
+
+      - name: Checkout Qt WebEngine 6.11.2 with Chromium sources
+        uses: actions/checkout@v4
+        with:
+          repository: qt/qtwebengine
+          ref: v6.11.2
+          path: qwe
+          fetch-depth: 1
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Apply Qt WebEngine MathML transport patch
+        shell: pwsh
+        run: |
+          $source = Get-Content "qt-math-a11y/qtwebengine-mathml.patch" -Raw
+          $patchFile = Join-Path $env:RUNNER_TEMP "qtwebengine-mathml-lf.patch"
+          $crlf = ([char]13).ToString() + ([char]10).ToString()
+          $lf = ([char]10).ToString()
+          [IO.File]::WriteAllText($patchFile, $source.Replace($crlf, $lf), [Text.UTF8Encoding]::new($false))
+          Push-Location qwe
+          try {
+            git apply --check $patchFile
+            if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine patch check failed" }
+            git apply $patchFile
+            if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine patch failed" }
+            git diff --check
+          } finally { Pop-Location }
+
+      - name: Configure patched Qt WebEngine Core
+        shell: pwsh
+        env:
+          NINJAFLAGS: "-j2"
+          QTWEBENGINE_GN_THREADS: "2"
+        run: |
+          New-Item -ItemType Directory -Force web-build | Out-Null
+          Push-Location web-build
+          try {
+            $cmakeArgs = @(
+              "-DQT_BUILD_EXAMPLES=OFF",
+              "-DQT_BUILD_TESTS=OFF",
+              "-DQT_SHOW_EXTRA_IDE_SOURCES=OFF",
+              "-DFEATURE_qtpdf_build=OFF",
+              "-DFEATURE_qtwebengine_widgets_build=OFF",
+              "-DFEATURE_qtwebengine_quick_build=OFF",
+              "-DFLEX_EXECUTABLE=$env:WIN_FLEX",
+              "-DBISON_EXECUTABLE=$env:WIN_BISON",
+              "-DGPerf_EXECUTABLE=$env:GPERF_EXE"
+            )
+            & "$env:QT_SDK\bin\qt-configure-module.bat" "$env:GITHUB_WORKSPACE\qwe" -- @cmakeArgs
+            if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine configure failed" }
+
+            $summaryPath = Join-Path (Get-Location) "config.summary"
+            if (-not (Test-Path $summaryPath)) { throw "Qt WebEngine config.summary missing" }
+            $summary = Get-Content $summaryPath -Raw
+            Write-Host $summary
+            if ($summary -match "QtWebEngine won't be built" -or $summary -match "configure errors were found") {
+              throw "Qt WebEngine was disabled during configuration"
+            }
+
+            $targets = ninja -t targets all
+            if ($LASTEXITCODE -ne 0) { throw "Could not enumerate Ninja targets" }
+            if (-not ($targets -match "(?m)^WebEngineCore:")) {
+              throw "WebEngineCore target was not generated"
+            }
+            Write-Host "WebEngineCore target generated successfully."
+          } finally { Pop-Location }
+
+      - name: Build patched Qt WebEngine Core
+        shell: pwsh
+        env:
+          NINJAFLAGS: "-j2"
+          QTWEBENGINE_GN_THREADS: "2"
+        run: |
+          cmake --build web-build --parallel 2 --target WebEngineCore
+          if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine Core build failed" }
+          $dll = Get-ChildItem web-build -Recurse -Filter Qt6WebEngineCore.dll -File | Sort-Object FullName | Select-Object -First 1
+          if (-not $dll) { throw "Patched Qt6WebEngineCore.dll was not produced" }
+          Write-Host "Patched WebEngineCore: $($dll.FullName)"
+          New-Item -ItemType Directory -Force out\webengine | Out-Null
+          Copy-Item $dll.FullName out\webengine\Qt6WebEngineCore.dll
+          Get-FileHash out\webengine\Qt6WebEngineCore.dll -Algorithm SHA256 | Format-List | Out-String | Set-Content out\webengine\sha256.txt
+          Get-Content out\webengine\sha256.txt
+
+      - name: Upload patched WebEngine runtime
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-6.11.2-mathml-webengine
+          if-no-files-found: warn
+          path: |
+            out/webengine/**
+            web-build/CMakeCache.txt
+            web-build/config.summary
