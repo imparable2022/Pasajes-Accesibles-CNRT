@@ -123,6 +123,13 @@ jobs:
           Write-Host "Patched qwindows: $($dll.FullName)"
           "PATCHED_QWINDOWS=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Preserve patched qwindows immediately
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-6.11.2-mathml-qwindows
+          if-no-files-found: error
+          path: ${{ env.PATCHED_QWINDOWS }}
+
       - name: Make installed Qt headers match the patched accessibility enum
         shell: pwsh
         run: |
@@ -138,12 +145,16 @@ jobs:
             Select-String -Path $header.FullName -Pattern "MathML" | ForEach-Object { Write-Host $_.Line }
           }
 
+      - name: Enable long Git paths for Chromium
+        shell: pwsh
+        run: git config --global core.longpaths true
+
       - name: Checkout Qt WebEngine 6.11.2 with Chromium sources
         uses: actions/checkout@v4
         with:
           repository: qt/qtwebengine
           ref: v6.11.2
-          path: upstream-qtwebengine
+          path: qwe
           fetch-depth: 1
           submodules: recursive
           persist-credentials: false
@@ -154,7 +165,7 @@ jobs:
           $source = Get-Content "qt-math-a11y/qtwebengine-mathml.patch" -Raw
           $patchFile = Join-Path $env:RUNNER_TEMP "qtwebengine-mathml-lf.patch"
           [IO.File]::WriteAllText($patchFile, $source.Replace("`r`n", "`n"), [Text.UTF8Encoding]::new($false))
-          Push-Location upstream-qtwebengine
+          Push-Location qwe
           try {
             git apply --check $patchFile
             if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine patch check failed" }
@@ -180,7 +191,7 @@ jobs:
               "-DFEATURE_qtwebengine_widgets_build=OFF",
               "-DFEATURE_qtwebengine_quick_build=OFF"
             )
-            & "$env:QT_SDK\bin\qt-configure-module.bat" "$env:GITHUB_WORKSPACE\upstream-qtwebengine" -- @cmakeArgs
+            & "$env:QT_SDK\bin\qt-configure-module.bat" "$env:GITHUB_WORKSPACE\qwe" -- @cmakeArgs
             if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine configure failed" }
           } finally { Pop-Location }
 
