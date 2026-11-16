@@ -1,0 +1,212 @@
+name: Build patched Qt 6.11.2 math transport runtime
+
+on:
+  push:
+    branches: [audit/anki-a11y-generalized-2026-11]
+    paths:
+      - "qt-math-a11y/**"
+      - ".github/workflows/qt-math-a11y-runtime-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-runtime:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    env:
+      QT_VERSION: "6.11.2"
+      QT_ARCH: "win64_msvc2022_64"
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Activate MSVC x64 environment
+        shell: pwsh
+        run: |
+          $vswhere = "$env:ProgramFiles(x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere not found" }
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "Visual Studio C++ toolchain not found" }
+          $dev = Join-Path $vs "Common7\Tools\VsDevCmd.bat"
+          Write-Host "Using VS environment: $dev"
+          $command = '"' + $dev + '" -arch=x64 -host_arch=x64 && set'
+          $dump = cmd /s /c $command
+          foreach ($line in $dump) {
+            if ($line -match '^([^=]+)=(.*)$') {
+              "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+
+      - name: Install matching official Qt binary SDK
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check "aqtinstall==3.3.0"
+          aqt list-qt windows desktop --arch $env:QT_VERSION
+          aqt list-qt windows desktop --modules $env:QT_VERSION $env:QT_ARCH
+          $root = Join-Path $env:GITHUB_WORKSPACE "qt-sdk"
+          aqt install-qt -O $root windows desktop $env:QT_VERSION $env:QT_ARCH -m qtwebengine
+          $qt = Join-Path $root "$env:QT_VERSION\msvc2022_64"
+          if (-not (Test-Path (Join-Path $qt "bin\qt-configure-module.bat"))) {
+            throw "qt-configure-module.bat missing from Qt SDK"
+          }
+          "QT_SDK=$qt" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$qt\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Report toolchain versions
+        shell: pwsh
+        run: |
+          cmake --version
+          ninja --version
+          node --version
+          python --version
+          cl 2>&1 | Select-Object -First 3
+          & "$env:QT_SDK\bin\qmake.exe" -query QT_VERSION
+
+      - name: Checkout Qt Base 6.11.2
+        uses: actions/checkout@v4
+        with:
+          repository: qt/qtbase
+          ref: v6.11.2
+          path: upstream-qtbase
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Apply Qt Base UIA MathML patch
+        shell: pwsh
+        run: |
+          Push-Location upstream-qtbase
+          try {
+            git apply --check ../qt-math-a11y/qtbase-uia-mathml.patch
+            if ($LASTEXITCODE -ne 0) { throw "Qt Base patch check failed" }
+            git apply ../qt-math-a11y/qtbase-uia-mathml.patch
+            if ($LASTEXITCODE -ne 0) { throw "Qt Base patch failed" }
+            git diff --check
+          } finally { Pop-Location }
+
+      - name: Configure patched Qt Base
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force qtbase-build | Out-Null
+          Push-Location qtbase-build
+          try {
+            $args = @(
+              "-release",
+              "-opensource", "-confirm-license",
+              "-nomake", "examples",
+              "-nomake", "tests",
+              "-cmake-generator", "Ninja",
+              "-prefix", "$env:GITHUB_WORKSPACE\qtbase-install"
+            )
+            & ..\upstream-qtbase\configure.bat @args
+            if ($LASTEXITCODE -ne 0) { throw "Qt Base configure failed" }
+          } finally { Pop-Location }
+
+      - name: Build patched Windows QPA plugin only
+        shell: pwsh
+        run: |
+          cmake --build qtbase-build --parallel --target QWindowsIntegrationPlugin
+          if ($LASTEXITCODE -ne 0) { throw "QWindowsIntegrationPlugin build failed" }
+          $dll = Get-ChildItem qtbase-build -Recurse -Filter qwindows.dll -File | Sort-Object FullName | Select-Object -First 1
+          if (-not $dll) { throw "Patched qwindows.dll was not produced" }
+          Write-Host "Patched qwindows: $($dll.FullName)"
+          "PATCHED_QWINDOWS=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Make installed Qt headers match the patched accessibility enum
+        shell: pwsh
+        run: |
+          $headers = @(Get-ChildItem "$env:QT_SDK\include" -Recurse -Filter qaccessible_base.h -File)
+          if (-not $headers) { throw "Installed qaccessible_base.h not found" }
+          foreach ($header in $headers) {
+            $text = Get-Content $header.FullName -Raw
+            if ($text -notmatch '\bMathML\b') {
+              $updated = $text -replace '(?m)^(\s*)Orientation,(\r?\n)', '$1Orientation,$2$1MathML,$2'
+              if ($updated -eq $text) { throw "Could not add MathML enum to $($header.FullName)" }
+              [IO.File]::WriteAllText($header.FullName, $updated, [Text.UTF8Encoding]::new($false))
+            }
+            Select-String -Path $header.FullName -Pattern "MathML" | ForEach-Object { Write-Host $_.Line }
+          }
+
+      - name: Checkout Qt WebEngine 6.11.2 with Chromium sources
+        uses: actions/checkout@v4
+        with:
+          repository: qt/qtwebengine
+          ref: v6.11.2
+          path: upstream-qtwebengine
+          fetch-depth: 1
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Apply Qt WebEngine MathML transport patch
+        shell: pwsh
+        run: |
+          Push-Location upstream-qtwebengine
+          try {
+            git apply --check ../qt-math-a11y/qtwebengine-mathml.patch
+            if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine patch check failed" }
+            git apply ../qt-math-a11y/qtwebengine-mathml.patch
+            if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine patch failed" }
+            git diff --check
+          } finally { Pop-Location }
+
+      - name: Configure only Qt WebEngine Core
+        shell: pwsh
+        env:
+          NINJAFLAGS: "-j2"
+          QTWEBENGINE_GN_THREADS: "2"
+        run: |
+          New-Item -ItemType Directory -Force qtwebengine-build | Out-Null
+          Push-Location qtwebengine-build
+          try {
+            $cmakeArgs = @(
+              "-DQT_BUILD_EXAMPLES=OFF",
+              "-DQT_BUILD_TESTS=OFF",
+              "-DQT_SHOW_EXTRA_IDE_SOURCES=OFF",
+              "-DFEATURE_qtpdf_build=OFF",
+              "-DFEATURE_qtwebengine_widgets_build=OFF",
+              "-DFEATURE_qtwebengine_quick_build=OFF"
+            )
+            & "$env:QT_SDK\bin\qt-configure-module.bat" "$env:GITHUB_WORKSPACE\upstream-qtwebengine" -- @cmakeArgs
+            if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine configure failed" }
+          } finally { Pop-Location }
+
+      - name: Build patched Qt WebEngine Core
+        shell: pwsh
+        env:
+          NINJAFLAGS: "-j2"
+          QTWEBENGINE_GN_THREADS: "2"
+        run: |
+          cmake --build qtwebengine-build --parallel 2 --target WebEngineCore
+          if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine Core build failed" }
+          $dll = Get-ChildItem qtwebengine-build -Recurse -Filter Qt6WebEngineCore.dll -File | Sort-Object FullName | Select-Object -First 1
+          if (-not $dll) { throw "Patched Qt6WebEngineCore.dll was not produced" }
+          Write-Host "Patched WebEngineCore: $($dll.FullName)"
+          "PATCHED_WEBENGINECORE=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Collect patched runtime binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out\qt-math-runtime | Out-Null
+          Copy-Item $env:PATCHED_QWINDOWS out\qt-math-runtime\qwindows.dll
+          Copy-Item $env:PATCHED_WEBENGINECORE out\qt-math-runtime\Qt6WebEngineCore.dll
+          Get-FileHash out\qt-math-runtime\*.dll -Algorithm SHA256 | Format-Table -AutoSize | Out-String | Set-Content out\qt-math-runtime\sha256.txt
+          Get-Content out\qt-math-runtime\sha256.txt
+
+      - name: Upload patched runtime
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-6.11.2-mathml-runtime
+          if-no-files-found: warn
+          path: |
+            out/qt-math-runtime/**
+            qtbase-build/CMakeCache.txt
+            qtwebengine-build/CMakeCache.txt
