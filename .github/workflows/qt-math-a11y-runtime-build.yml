@@ -71,6 +71,30 @@ jobs:
           cl 2>&1 | Select-Object -First 3
           & "$env:QT_SDK\bin\qmake.exe" -query QT_VERSION
 
+      - name: Install Qt WebEngine build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check html5lib
+          choco install winflexbison3 gperf -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Chocolatey Qt WebEngine dependency install failed" }
+
+          $toolDir = Join-Path $env:RUNNER_TEMP "qtwebengine-tools"
+          New-Item -ItemType Directory -Force $toolDir | Out-Null
+
+          $winFlex = (Get-Command win_flex.exe -ErrorAction Stop).Source
+          $winBison = (Get-Command win_bison.exe -ErrorAction Stop).Source
+          $gperf = (Get-Command gperf.exe -ErrorAction Stop).Source
+
+          Copy-Item $winFlex (Join-Path $toolDir "flex.exe") -Force
+          Copy-Item $winBison (Join-Path $toolDir "bison.exe") -Force
+          Copy-Item $gperf (Join-Path $toolDir "gperf.exe") -Force
+
+          $toolDir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          & (Join-Path $toolDir "flex.exe") --version
+          & (Join-Path $toolDir "bison.exe") --version
+          & (Join-Path $toolDir "gperf.exe") --version
+          python -c "import html5lib; print('html5lib', html5lib.__version__)"
+
       - name: Checkout Qt Base 6.11.2
         uses: actions/checkout@v4
         with:
@@ -193,6 +217,20 @@ jobs:
             )
             & "$env:QT_SDK\bin\qt-configure-module.bat" "$env:GITHUB_WORKSPACE\qwe" -- @cmakeArgs
             if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine configure failed" }
+
+            $summaryPath = Join-Path (Get-Location) "config.summary"
+            if (-not (Test-Path $summaryPath)) { throw "Qt WebEngine config.summary missing" }
+            $summary = Get-Content $summaryPath -Raw
+            Write-Host $summary
+            if ($summary -match "QtWebEngine won't be built" -or $summary -match "Tool flex is required" -or $summary -match "Tool bison is required" -or $summary -match "Tool gperf is required" -or $summary -match "html5lib is missing") {
+              throw "Qt WebEngine was disabled during configuration"
+            }
+
+            $targets = ninja -t targets all
+            if ($LASTEXITCODE -ne 0) { throw "Could not enumerate Ninja targets" }
+            if (-not ($targets -match "(?m)^WebEngineCore:")) {
+              throw "WebEngineCore target was not generated"
+            }
           } finally { Pop-Location }
 
       - name: Build patched Qt WebEngine Core
