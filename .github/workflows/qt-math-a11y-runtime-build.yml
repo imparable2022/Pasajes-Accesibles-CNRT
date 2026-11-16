@@ -83,11 +83,14 @@ jobs:
       - name: Apply Qt Base UIA MathML patch
         shell: pwsh
         run: |
+          $source = Get-Content "qt-math-a11y/qtbase-uia-mathml.patch" -Raw
+          $patchFile = Join-Path $env:RUNNER_TEMP "qtbase-uia-mathml-lf.patch"
+          [IO.File]::WriteAllText($patchFile, $source.Replace("`r`n", "`n"), [Text.UTF8Encoding]::new($false))
           Push-Location upstream-qtbase
           try {
-            git apply --check ../qt-math-a11y/qtbase-uia-mathml.patch
+            git apply --check $patchFile
             if ($LASTEXITCODE -ne 0) { throw "Qt Base patch check failed" }
-            git apply ../qt-math-a11y/qtbase-uia-mathml.patch
+            git apply $patchFile
             if ($LASTEXITCODE -ne 0) { throw "Qt Base patch failed" }
             git diff --check
           } finally { Pop-Location }
@@ -148,11 +151,14 @@ jobs:
       - name: Apply Qt WebEngine MathML transport patch
         shell: pwsh
         run: |
+          $source = Get-Content "qt-math-a11y/qtwebengine-mathml.patch" -Raw
+          $patchFile = Join-Path $env:RUNNER_TEMP "qtwebengine-mathml-lf.patch"
+          [IO.File]::WriteAllText($patchFile, $source.Replace("`r`n", "`n"), [Text.UTF8Encoding]::new($false))
           Push-Location upstream-qtwebengine
           try {
-            git apply --check ../qt-math-a11y/qtwebengine-mathml.patch
+            git apply --check $patchFile
             if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine patch check failed" }
-            git apply ../qt-math-a11y/qtwebengine-mathml.patch
+            git apply $patchFile
             if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine patch failed" }
             git diff --check
           } finally { Pop-Location }
