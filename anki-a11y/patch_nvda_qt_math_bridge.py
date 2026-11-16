@@ -117,27 +117,18 @@ SPY_DIAGNOSTIC = '''
 \t\t\t\tif isinstance(nav, UIA):
 \t\t\t\t\t# Read properties from the underlying Qt UIA provider directly.
 \t\t\t\t\t# These bypass the test overlay and form the stock-Qt baseline.
-\t\t\t\t\tfor key, propertyId in (
-\t\t\t\t\t\t("raw_uia_control_type", UIAHandler.UIA_ControlTypePropertyId),
-\t\t\t\t\t\t("raw_uia_aria_role", UIAHandler.UIA_AriaRolePropertyId),
-\t\t\t\t\t\t("raw_uia_localized_control_type", UIAHandler.UIA_LocalizedControlTypePropertyId),
-\t\t\t\t\t):
-\t\t\t\t\t\ttry:
-\t\t\t\t\t\t\tresult[key] = nav._getUIACacheablePropertyValue(propertyId)
-\t\t\t\t\t\texcept Exception as error:
-\t\t\t\t\t\t\tresult[key + "_error"] = repr(error)
 \t\t\t\t\ttry:
+\t\t\t\t\t\tresult["raw_uia_control_type"] = nav._getUIACacheablePropertyValue(UIAHandler.UIA_ControlTypePropertyId)
+\t\t\t\t\t\tresult["raw_uia_aria_role"] = nav._getUIACacheablePropertyValue(UIAHandler.UIA_AriaRolePropertyId)
+\t\t\t\t\t\tresult["raw_uia_localized_control_type"] = nav._getUIACacheablePropertyValue(UIAHandler.UIA_LocalizedControlTypePropertyId)
 \t\t\t\t\t\trawMathMl = nav._getUIACacheablePropertyValue(nav._UIACustomProps.word_mathml.id)
 \t\t\t\t\t\tresult["raw_uia_mathml"] = rawMathMl
 \t\t\t\t\t\tresult["raw_uia_mathml_present"] = bool(rawMathMl)
 \t\t\t\t\t\tif rawMathMl:
 \t\t\t\t\t\t\tinspectMathMl("raw_uia_mathml", rawMathMl)
-\t\t\t\t\t\texcept Exception as error:
-\t\t\t\t\t\tresult["raw_uia_mathml_error"] = repr(error)
-\t\t\t\tresult["raw_qt_transport_complete"] = (
-\t\t\t\t\tstr(result.get("raw_uia_aria_role", "") or "").casefold() == "math"
-\t\t\t\t\tand bool(result.get("raw_uia_mathml_valid"))
-\t\t\t\t)
+\t\t\t\t\texcept Exception as error:
+\t\t\t\t\t\tresult["raw_uia_probe_error"] = repr(error)
+\t\t\t\tresult["raw_qt_transport_complete"] = str(result.get("raw_uia_aria_role", "") or "").casefold() == "math" and bool(result.get("raw_uia_mathml_valid"))
 \t\t\t\tresult["review_type"] = type(review).__name__
 \t\t\t\tresult["review_obj_type"] = type(getattr(review, "obj", None)).__name__
 \t\t\t\tresult["review_obj_role"] = str(getattr(getattr(review, "obj", None), "role", None))
