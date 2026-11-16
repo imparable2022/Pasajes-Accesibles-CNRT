@@ -461,9 +461,36 @@ def _speech_probe(kind):
         nav_speech = press(f"{kind}: move navigator to focused math", "NVDA+numpadMinus", .55)
         spy.dump_speech_to_log()
         robot.sleep(".4 seconds")
-        math_context = spy.get_math_context()
+        raw_math_context = spy.get_math_context()
+        try:
+            math_context = json.loads(raw_math_context)
+        except Exception as error:
+            math_context = {"parse_error": repr(error), "raw": raw_math_context[:6000]}
         note("MATH_FOCUSED_ACCESSIBILITY_OBJECT", kind=kind,
-             navigator_speech=nav_speech[:900], math_context=math_context[:6000])
+             navigator_speech=nav_speech[:900], math_context=math_context)
+        _semantic_check(
+            kind, "qt_bridge_correct_qt_object",
+            bool(math_context.get("navigator_is_uia"))
+            and math_context.get("focus_type") == math_context.get("navigator_type"),
+            math_context,
+            "The focused/navigator object carrying the marker must be the Qt UIA object seen by NVDA",
+        )
+        _semantic_check(
+            kind, "qt_bridge_marker_and_math_role",
+            bool(math_context.get("navigator_marker_seen"))
+            and bool(math_context.get("navigator_bridge_overlay"))
+            and bool(math_context.get("navigator_is_math_role")),
+            math_context,
+            "The ANKI_MATHML marker must select the bridge and the resulting NVDA object must have Role.MATH",
+        )
+        _semantic_check(
+            kind, "qt_bridge_valid_mathml_delivered",
+            bool(math_context.get("navigator_mathMl_property_valid"))
+            and bool(math_context.get("navigator_mathMl_getter_valid"))
+            and bool(math_context.get("navigator_mathMl_sources_match")),
+            math_context,
+            "Both NVDA mathMl access paths must return the same XML-valid MathML with a math root",
+        )
         # Perform the user-facing MathCAT command while our experimental
         # MathML target still has keyboard focus and the navigator is aligned.
         entered_speech = press(f"{kind}: enter MathCAT directly", "NVDA+alt+m", 1.1)
@@ -493,18 +520,35 @@ def _speech_probe(kind):
         # Prove that ZoomIn (DownArrow) reaches inside composite structures,
         # not merely between top-level terms. The following RightArrow must
         # then move between the composite's own children.
-        if entered_mode and kind in ("Math", "MathExponent") and len(spoken_segments) >= 5:
+        if entered_mode and kind in ("Math", "MathExponent", "MathEquation") and len(spoken_segments) >= 7:
             deep_first = spoken_segments[3].casefold().strip()
             deep_next = spoken_segments[4].casefold().strip()
+            relation = spoken_segments[6].casefold().strip()
             if kind == "Math":
-                deep_ok = deep_first == "1" and deep_next == "2"
+                deep_ok = (
+                    "numerator" in deep_first and "1" in deep_first
+                    and "denominator" in deep_next and "2" in deep_next
+                )
                 deep_note = "DownArrow must enter the fraction numerator and RightArrow must reach the denominator"
-            else:
-                deep_ok = ("x" in deep_first and
-                           any(token in deep_next for token in ("2", "two")))
+                deep_evidence = [deep_first, deep_next]
+            elif kind == "MathExponent":
+                deep_ok = (
+                    "base" in deep_first and "x" in deep_first
+                    and "exponent" in deep_next
+                    and any(token in deep_next for token in ("2", "two"))
+                )
                 deep_note = "DownArrow must enter the power base and RightArrow must reach the exponent"
+                deep_evidence = [deep_first, deep_next]
+            else:
+                deep_ok = (
+                    "2" in deep_first and "x" in deep_first
+                    and "plus" in deep_next
+                    and any(token in relation for token in ("equal", "equals"))
+                )
+                deep_note = "Arrow navigation must enter the equation's first term, move to plus, then reach the equality relation"
+                deep_evidence = [deep_first, deep_next, relation]
             _semantic_check(kind, "mathcat_deep_component_navigation",
-                            deep_ok, [deep_first, deep_next], deep_note)
+                            deep_ok, deep_evidence, deep_note)
         labels = ["NVDA+alt+m"] + mathcat_gestures
         samples.extend({"gesture":label,"speech":value} for label,value in
                        zip(labels,spoken_segments))

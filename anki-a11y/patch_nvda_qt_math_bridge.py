@@ -25,10 +25,18 @@ class _AnkiQtMathBridge:
 
 \tdef _decodeMathMl(self):
 \t\tfrom urllib.parse import unquote
+\t\tfrom xml.etree import ElementTree
 \t\tdesc = self.description or ""
 \t\tif not desc.startswith(_ANKI_MATH_MARKER):
 \t\t\traise LookupError("No Anki MathML marker")
-\t\treturn unquote(desc[len(_ANKI_MATH_MARKER):])
+\t\tmathMl = unquote(desc[len(_ANKI_MATH_MARKER):])
+\t\ttry:
+\t\t\troot = ElementTree.fromstring(mathMl)
+\t\texcept ElementTree.ParseError as error:
+\t\t\traise LookupError("Invalid XML in Anki MathML marker") from error
+\t\tif root.tag.rsplit("}", 1)[-1] != "math":
+\t\t\traise LookupError("Anki MathML marker does not contain a math root")
+\t\treturn mathMl
 
 \t@property
 \tdef mathMl(self):
@@ -72,29 +80,55 @@ SPY_DIAGNOSTIC = '''
 \t\tdef collect():
 \t\t\ttry:
 \t\t\t\timport api
+\t\t\t\timport controlTypes
 \t\t\t\timport mathPres
+\t\t\t\tfrom NVDAObjects.UIA import UIA
+\t\t\t\tfrom xml.etree import ElementTree
 \t\t\t\tfocus = api.getFocusObject()
 \t\t\t\tnav = api.getNavigatorObject()
 \t\t\t\treview = api.getReviewPosition()
+
+\t\t\t\tdef inspectMathMl(prefix, value):
+\t\t\t\t\tresult[prefix] = value
+\t\t\t\t\ttry:
+\t\t\t\t\t\troot = ElementTree.fromstring(value)
+\t\t\t\t\t\tlocalName = root.tag.rsplit("}", 1)[-1]
+\t\t\t\t\t\tresult[prefix + "_root"] = localName
+\t\t\t\t\t\tresult[prefix + "_valid"] = localName == "math"
+\t\t\t\t\texcept Exception as error:
+\t\t\t\t\t\tresult[prefix + "_valid"] = False
+\t\t\t\t\t\tresult[prefix + "_validation_error"] = repr(error)
+
+\t\t\t\tfocusDesc = str(getattr(focus, "description", "") or "")
+\t\t\t\tnavDesc = str(getattr(nav, "description", "") or "")
 \t\t\t\tresult["focus_type"] = type(focus).__name__
 \t\t\t\tresult["focus_role"] = str(getattr(focus, "role", None))
-\t\t\t\tresult["focus_description"] = str(getattr(focus, "description", "") or "")[:1000]
+\t\t\t\tresult["focus_description"] = focusDesc[:1000]
+\t\t\t\tresult["focus_marker_seen"] = focusDesc.startswith(_ANKI_MATH_MARKER)
 \t\t\t\tresult["navigator_type"] = type(nav).__name__
 \t\t\t\tresult["navigator_mro"] = [c.__name__ for c in type(nav).__mro__]
 \t\t\t\tresult["navigator_role"] = str(getattr(nav, "role", None))
-\t\t\t\tresult["navigator_description"] = str(getattr(nav, "description", "") or "")[:1000]
+\t\t\t\tresult["navigator_description"] = navDesc[:1000]
+\t\t\t\tresult["navigator_marker_seen"] = navDesc.startswith(_ANKI_MATH_MARKER)
+\t\t\t\tresult["navigator_is_uia"] = isinstance(nav, UIA)
+\t\t\t\tresult["navigator_bridge_overlay"] = "_AnkiQtMathBridge" in result["navigator_mro"]
+\t\t\t\tresult["navigator_is_math_role"] = getattr(nav, "role", None) == controlTypes.Role.MATH
 \t\t\t\tresult["review_type"] = type(review).__name__
 \t\t\t\tresult["review_obj_type"] = type(getattr(review, "obj", None)).__name__
 \t\t\t\tresult["review_obj_role"] = str(getattr(getattr(review, "obj", None), "role", None))
 \t\t\t\ttry:
-\t\t\t\t\tresult["navigator_mathMl_property"] = nav.mathMl
+\t\t\t\t\tinspectMathMl("navigator_mathMl_property", nav.mathMl)
 \t\t\t\texcept Exception as error:
 \t\t\t\t\tresult["navigator_mathMl_property_error"] = repr(error)
 \t\t\t\ttry:
 \t\t\t\t\tgetter = getattr(nav, "_get_mathMl")
-\t\t\t\t\tresult["navigator_mathMl_getter"] = getter()
+\t\t\t\t\tinspectMathMl("navigator_mathMl_getter", getter())
 \t\t\t\texcept Exception as error:
 \t\t\t\t\tresult["navigator_mathMl_getter_error"] = repr(error)
+\t\t\t\tresult["navigator_mathMl_sources_match"] = (
+\t\t\t\t\tresult.get("navigator_mathMl_property") is not None
+\t\t\t\t\tand result.get("navigator_mathMl_property") == result.get("navigator_mathMl_getter")
+\t\t\t\t)
 \t\t\t\ttry:
 \t\t\t\t\tresult["review_mathMl"] = mathPres.getMathMlFromTextInfo(review)
 \t\t\t\texcept Exception as error:

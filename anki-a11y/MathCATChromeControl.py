@@ -41,7 +41,8 @@ def verify_mathcat_in_chrome():
             utterances.append({"gesture":gesture,"speech":NvdaLib.getSpeechAfterKey(gesture)})
         entry = utterances[-1]["speech"]
         if "not math" not in entry.casefold():
-            for gesture in ["space","downArrow","rightArrow","space","escape"]:
+            for gesture in ["space","downArrow","downArrow","rightArrow",
+                            "upArrow","rightArrow","space","escape"]:
                 utterances.append({"gesture":gesture,"speech":NvdaLib.getSpeechAfterKey(gesture)})
         spoken = " ".join(str(v["speech"]) for v in utterances).casefold()
         # Seeing the word "math" is not success: in the first control run
@@ -50,11 +51,39 @@ def verify_mathcat_in_chrome():
         errors = [item["speech"] for item in utterances
                   if "error in" in item["speech"].casefold() or "not math" in item["speech"].casefold()]
         after_entry = " ".join(str(item["speech"]) for item in utterances[6:]).casefold()
+        deep_first = str(utterances[8]["speech"]).casefold().strip() if len(utterances) > 9 else ""
+        deep_next = str(utterances[9]["speech"]).casefold().strip() if len(utterances) > 9 else ""
+        relation = str(utterances[11]["speech"]).casefold().strip() if len(utterances) > 11 else ""
+        if kind == "fraction":
+            deep = (
+                "numerator" in deep_first and "1" in deep_first
+                and "denominator" in deep_next and "2" in deep_next
+            )
+        elif kind == "power":
+            deep = (
+                "base" in deep_first and "x" in deep_first
+                and "exponent" in deep_next
+                and any(token in deep_next for token in ("2", "two"))
+            )
+        else:
+            deep = (
+                "2" in deep_first and "x" in deep_first
+                and "plus" in deep_next
+                and any(token in relation for token in ("equal", "equals"))
+            )
         mathcat = (not errors and
                    "not math" not in entry.casefold() and
+                   deep and
                    any(token in after_entry for token in
                        ("numerator","denominator","fraction","half","fourth","quarter","power","squared","cubed","equal")))
-        records.append({"kind":kind,"entry":entry,"mathcat_usable":mathcat,"utterances":utterances})
+        records.append({
+            "kind":kind,
+            "entry":entry,
+            "mathcat_usable":mathcat,
+            "deep_navigation":deep,
+            "deep_evidence":[deep_first, deep_next, relation],
+            "utterances":utterances,
+        })
         output.write_text(json.dumps(records,ensure_ascii=False,indent=2),encoding="utf-8")
         robot.log(f"Chrome MathCAT {kind}: {records[-1]}")
     failures = [x["kind"] for x in records if not x["mathcat_usable"]]
