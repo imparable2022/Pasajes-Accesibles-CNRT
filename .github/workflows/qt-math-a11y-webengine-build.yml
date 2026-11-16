@@ -14,7 +14,7 @@ permissions:
 jobs:
   build-webengine:
     runs-on: windows-2022
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       QT_VERSION: "6.11.2"
       QT_ARCH: "win64_msvc2022_64"
@@ -142,8 +142,8 @@ jobs:
       - name: Configure patched Qt WebEngine Core
         shell: pwsh
         env:
-          NINJAFLAGS: "-j2"
-          QTWEBENGINE_GN_THREADS: "2"
+          NINJAFLAGS: "-j4"
+          QTWEBENGINE_GN_THREADS: "4"
         run: |
           New-Item -ItemType Directory -Force web-build | Out-Null
           Push-Location web-build
@@ -181,10 +181,10 @@ jobs:
       - name: Build patched Qt WebEngine Core
         shell: pwsh
         env:
-          NINJAFLAGS: "-j2"
-          QTWEBENGINE_GN_THREADS: "2"
+          NINJAFLAGS: "-j4"
+          QTWEBENGINE_GN_THREADS: "4"
         run: |
-          cmake --build web-build --parallel 2 --target WebEngineCore
+          cmake --build web-build --parallel 4 --target WebEngineCore
           if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine Core build failed" }
           $dll = Get-ChildItem web-build -Recurse -Filter Qt6WebEngineCore.dll -File | Sort-Object FullName | Select-Object -First 1
           if (-not $dll) { throw "Patched Qt6WebEngineCore.dll was not produced" }
