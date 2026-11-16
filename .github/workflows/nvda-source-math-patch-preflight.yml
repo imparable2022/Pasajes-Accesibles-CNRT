@@ -1,0 +1,108 @@
+name: NVDA 2026.3.1 generic UIA math source preflight
+
+on:
+  push:
+    branches: [audit/anki-a11y-generalized-2026-11]
+    paths:
+      - "qt-math-a11y/nvda-generic-uia-math.patch"
+      - "qt-math-a11y/patch_nvda_math_diagnostic.py"
+      - ".github/workflows/nvda-source-math-patch-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VSCMD_SKIP_SENDTELEMETRY: 1
+  SCONS_CACHE_MSVC_CONFIG: ".scons_msvc_cache.json"
+
+jobs:
+  nvda-source:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout NVDA 2026.3.1 recursively
+        uses: actions/checkout@v4
+        with:
+          repository: nvaccess/nvda
+          ref: release-2026.3.1
+          path: nvda-source
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install Python 3.13.17 x64
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13.17"
+          architecture: x64
+          update-environment: true
+
+      - name: Install Python 3.13.17 x86 for NVDA build helpers
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13.17"
+          architecture: x86
+          update-environment: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.13.5"
+          python-version: cpython-3.13.17-windows-x86_64-none
+
+      - name: Apply generic UIA math patch to real NVDA source
+        shell: pwsh
+        run: |
+          $source = Get-Content "qt-math-a11y/nvda-generic-uia-math.patch" -Raw
+          $patchFile = Join-Path $env:RUNNER_TEMP "nvda-generic-uia-math-lf.patch"
+          [IO.File]::WriteAllText(
+            $patchFile,
+            $source.Replace(([char]13).ToString() + ([char]10).ToString(), ([char]10).ToString()),
+            [Text.UTF8Encoding]::new($false)
+          )
+          Push-Location nvda-source
+          try {
+            git apply --check $patchFile
+            if ($LASTEXITCODE -ne 0) { throw "Generic NVDA UIA math patch does not apply to release-2026.3.1" }
+            git apply $patchFile
+            if ($LASTEXITCODE -ne 0) { throw "Generic NVDA UIA math patch failed" }
+            git diff --check
+            if ($LASTEXITCODE -ne 0) { throw "Patched NVDA source has whitespace errors" }
+            git diff -- source/NVDAObjects/UIA/__init__.py
+          } finally { Pop-Location }
+
+      - name: Prepare patched NVDA source tree
+        shell: cmd
+        working-directory: nvda-source
+        run: scons.bat source --all-cores
+
+      - name: Verify generated source keeps the generic UIA math implementation
+        shell: pwsh
+        run: |
+          $file = "nvda-source/source/NVDAObjects/UIA/__init__.py"
+          $text = Get-Content $file -Raw
+          foreach ($needle in @(
+            'UIAAriaRole = self._getUIACacheablePropertyValue(UIAHandler.UIA_AriaRolePropertyId) or ""',
+            'if "math" in UIAAriaRole.casefold().split():',
+            'class UIAMath(UIA):',
+            'self._UIACustomProps.word_mathml.id',
+            'return controlTypes.Role.MATH'
+          )) {
+            if (-not $text.Contains($needle)) { throw "Missing patched NVDA source invariant: $needle" }
+          }
+          python -m py_compile $file
+
+      - name: Upload source-build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvda-2026.3.1-generic-uia-math-source-preflight
+          if-no-files-found: warn
+          path: |
+            nvda-source/.scons_msvc_cache.json
+            nvda-source/source/NVDAObjects/UIA/__init__.py
