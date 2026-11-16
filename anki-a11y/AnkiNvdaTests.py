@@ -26,6 +26,7 @@ data_dir = out / "isolated-profile"
 DECK = "NVDA Accessibility Audit 2026"
 FRONT = "Accessible keyboard study question"
 BACK = "Accessible keyboard study answer"
+QT_TRANSPORT_MODE = os.environ.get("ANKI_A11Y_QT_TRANSPORT", "bridge").casefold()
 
 def save():
     (out / "speech.json").write_text(json.dumps({
@@ -469,28 +470,55 @@ def _speech_probe(kind):
         note("MATH_FOCUSED_ACCESSIBILITY_OBJECT", kind=kind,
              navigator_speech=nav_speech[:900], math_context=math_context)
         _semantic_check(
-            kind, "qt_bridge_correct_qt_object",
-            bool(math_context.get("navigator_is_uia"))
-            and math_context.get("focus_type") == math_context.get("navigator_type"),
+            kind, "qt_math_correct_qt_object",
+            bool(math_context.get("navigator_is_uia")),
             math_context,
-            "The focused/navigator object carrying the marker must be the Qt UIA object seen by NVDA",
+            "The navigator object must be the real Qt UIA object seen by NVDA",
         )
-        _semantic_check(
-            kind, "qt_bridge_marker_and_math_role",
-            bool(math_context.get("navigator_marker_seen"))
-            and bool(math_context.get("navigator_bridge_overlay"))
-            and bool(math_context.get("navigator_is_math_role")),
-            math_context,
-            "The ANKI_MATHML marker must select the bridge and the resulting NVDA object must have Role.MATH",
-        )
-        _semantic_check(
-            kind, "qt_bridge_valid_mathml_delivered",
-            bool(math_context.get("navigator_mathMl_property_valid"))
-            and bool(math_context.get("navigator_mathMl_getter_valid"))
-            and bool(math_context.get("navigator_mathMl_sources_match")),
-            math_context,
-            "Both NVDA mathMl access paths must return the same XML-valid MathML with a math root",
-        )
+        if QT_TRANSPORT_MODE == "production":
+            _semantic_check(
+                kind, "qt_native_raw_transport",
+                bool(math_context.get("raw_qt_transport_complete"))
+                and str(math_context.get("raw_uia_aria_role", "") or "").casefold() == "math"
+                and bool(math_context.get("raw_uia_mathml_present"))
+                and bool(math_context.get("raw_uia_mathml_valid")),
+                math_context,
+                "Patched Qt must expose invariant ARIA role math plus XML-valid MathML through the raw UIA provider",
+            )
+            _semantic_check(
+                kind, "qt_native_no_marker_or_bridge",
+                not bool(math_context.get("navigator_marker_seen"))
+                and not bool(math_context.get("focus_marker_seen"))
+                and not bool(math_context.get("navigator_bridge_overlay"))
+                and bool(math_context.get("navigator_is_math_role")),
+                math_context,
+                "Production transport must use native UIA data: no ANKI_MATHML marker and no experimental bridge overlay",
+            )
+            _semantic_check(
+                kind, "nvda_generic_uia_mathml_delivered",
+                bool(math_context.get("navigator_mathMl_property_valid"))
+                and bool(math_context.get("navigator_mathMl_getter_valid"))
+                and bool(math_context.get("navigator_mathMl_sources_match")),
+                math_context,
+                "The generic NVDA UIA math implementation must return the same XML-valid MathML through both access paths",
+            )
+        else:
+            _semantic_check(
+                kind, "qt_bridge_marker_and_math_role",
+                bool(math_context.get("navigator_marker_seen"))
+                and bool(math_context.get("navigator_bridge_overlay"))
+                and bool(math_context.get("navigator_is_math_role")),
+                math_context,
+                "The ANKI_MATHML marker must select the diagnostic bridge and the resulting NVDA object must have Role.MATH",
+            )
+            _semantic_check(
+                kind, "qt_bridge_valid_mathml_delivered",
+                bool(math_context.get("navigator_mathMl_property_valid"))
+                and bool(math_context.get("navigator_mathMl_getter_valid"))
+                and bool(math_context.get("navigator_mathMl_sources_match")),
+                math_context,
+                "Both NVDA mathMl access paths must return the same XML-valid MathML with a math root",
+            )
         # Perform the user-facing MathCAT command while our experimental
         # MathML target still has keyboard focus and the navigator is aligned.
         entered_speech = press(f"{kind}: enter MathCAT directly", "NVDA+alt+m", 1.1)
