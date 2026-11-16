@@ -1,0 +1,301 @@
+name: Anki native Qt MathML plus NVDA MathCAT audit
+
+on:
+  push:
+    branches: [audit/anki-a11y-generalized-2026-11]
+    paths:
+      - "qt-math-a11y/native-audit-trigger.txt"
+  workflow_dispatch:
+    inputs:
+      webengine_run_id:
+        description: "Successful Qt WebEngine build run ID"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  VSCMD_SKIP_SENDTELEMETRY: 1
+  SCONS_CACHE_MSVC_CONFIG: ".scons_msvc_cache.json"
+
+jobs:
+  native-math:
+    runs-on: windows-2025
+    timeout-minutes: 180
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Resolve successful patched WebEngine build
+        id: webengine
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_RUN_ID: ${{ inputs.webengine_run_id }}
+        run: |
+          $runId = $env:INPUT_RUN_ID
+          if (-not $runId) {
+            $trigger = "qt-math-a11y/native-audit-trigger.txt"
+            if (-not (Test-Path $trigger)) { throw "No WebEngine run ID input or trigger file" }
+            $runId = (Get-Content $trigger -Raw).Trim()
+          }
+          if ($runId -notmatch '^\d+$') { throw "Invalid WebEngine run ID: $runId" }
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+            "User-Agent" = "anki-native-math-audit"
+          }
+          $run = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/runs/$runId"
+          if ($run.name -ne "Build patched Qt WebEngine 6.11.2 MathML transport") {
+            throw "Run $runId is not the patched Qt WebEngine workflow"
+          }
+          if ($run.status -ne "completed" -or $run.conclusion -ne "success") {
+            throw "WebEngine run $runId is not a successful completed run: status=$($run.status) conclusion=$($run.conclusion)"
+          }
+          "run_id=$runId" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Using successful WebEngine run $runId at commit $($run.head_sha)"
+
+      - name: Download patched Qt runtime artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WEBENGINE_RUN_ID: ${{ steps.webengine.outputs.run_id }}
+        run: |
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+            "User-Agent" = "anki-native-math-audit"
+          }
+          New-Item -ItemType Directory -Force runtime-artifacts/webengine,runtime-artifacts/qwindows | Out-Null
+
+          $runArtifacts = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/runs/$env:WEBENGINE_RUN_ID/artifacts?per_page=100"
+          $web = @($runArtifacts.artifacts | Where-Object { $_.name -eq "qt-6.11.2-mathml-webengine" -and -not $_.expired })
+          if ($web.Count -ne 1) { throw "Expected one non-expired patched WebEngine artifact, found $($web.Count)" }
+          Invoke-WebRequest -Headers $headers -Uri $web[0].archive_download_url -OutFile runtime-artifacts/webengine.zip
+          Expand-Archive runtime-artifacts/webengine.zip runtime-artifacts/webengine -Force
+
+          $allQwindows = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts?name=qt-6.11.2-mathml-qwindows&per_page=100"
+          $qwin = @($allQwindows.artifacts | Where-Object { -not $_.expired } | Sort-Object created_at -Descending | Select-Object -First 1)
+          if ($qwin.Count -ne 1) { throw "No non-expired patched qwindows artifact found" }
+          Invoke-WebRequest -Headers $headers -Uri $qwin[0].archive_download_url -OutFile runtime-artifacts/qwindows.zip
+          Expand-Archive runtime-artifacts/qwindows.zip runtime-artifacts/qwindows -Force
+
+          $webDll = @(Get-ChildItem runtime-artifacts/webengine -Recurse -Filter Qt6WebEngineCore.dll -File)
+          $qwinDll = @(Get-ChildItem runtime-artifacts/qwindows -Recurse -Filter qwindows.dll -File)
+          if ($webDll.Count -ne 1) { throw "Expected one completed Qt6WebEngineCore.dll, found $($webDll.Count)" }
+          if ($qwinDll.Count -lt 1) { throw "Patched qwindows.dll missing from artifact" }
+          "PATCHED_WEBENGINE=$($webDll[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PATCHED_QWINDOWS=$($qwinDll[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "WebEngine SHA256: $((Get-FileHash $webDll[0].FullName -Algorithm SHA256).Hash)"
+          Write-Host "qwindows SHA256: $((Get-FileHash $qwinDll[0].FullName -Algorithm SHA256).Hash)"
+
+      - name: Install verified official Anki 26.09.4
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./anki-a11y/get-anki.ps1 -Tag '26.09.4'
+
+      - name: Replace Anki Qt runtime with patched 6.11.2 transport
+        shell: pwsh
+        run: |
+          if (-not $env:ANKI_EXE -or -not (Test-Path $env:ANKI_EXE)) { throw "ANKI_EXE missing" }
+          $root = Split-Path $env:ANKI_EXE -Parent
+          $webTargets = @(Get-ChildItem $root -Recurse -Filter Qt6WebEngineCore.dll -File)
+          $qwinTargets = @(Get-ChildItem $root -Recurse -Filter qwindows.dll -File | Where-Object { $_.FullName -match '[\\/]platforms[\\/]' })
+          if (-not $webTargets) { throw "Installed Anki Qt6WebEngineCore.dll not found under $root" }
+          if (-not $qwinTargets) { throw "Installed Anki platforms/qwindows.dll not found under $root" }
+
+          New-Item -ItemType Directory -Force out/native-a11y/runtime-original-hashes | Out-Null
+          $manifest = @()
+          foreach ($target in $webTargets) {
+            $manifest += [pscustomobject]@{ path=$target.FullName; kind="Qt6WebEngineCore"; original=(Get-FileHash $target.FullName -Algorithm SHA256).Hash }
+            Copy-Item $env:PATCHED_WEBENGINE $target.FullName -Force
+          }
+          foreach ($target in $qwinTargets) {
+            $manifest += [pscustomobject]@{ path=$target.FullName; kind="qwindows"; original=(Get-FileHash $target.FullName -Algorithm SHA256).Hash }
+            Copy-Item $env:PATCHED_QWINDOWS $target.FullName -Force
+          }
+          $manifest | ConvertTo-Json -Depth 4 | Set-Content out/native-a11y/runtime-original-hashes/manifest.json
+          $webHash = (Get-FileHash $env:PATCHED_WEBENGINE -Algorithm SHA256).Hash
+          $qwinHash = (Get-FileHash $env:PATCHED_QWINDOWS -Algorithm SHA256).Hash
+          foreach ($target in $webTargets) {
+            if ((Get-FileHash $target.FullName -Algorithm SHA256).Hash -ne $webHash) { throw "WebEngine replacement hash mismatch: $($target.FullName)" }
+          }
+          foreach ($target in $qwinTargets) {
+            if ((Get-FileHash $target.FullName -Algorithm SHA256).Hash -ne $qwinHash) { throw "qwindows replacement hash mismatch: $($target.FullName)" }
+          }
+          Write-Host "Replaced $($webTargets.Count) WebEngine DLL(s) and $($qwinTargets.Count) qwindows plugin(s)."
+
+      - name: Checkout NVDA 2026.3.1 source recursively
+        uses: actions/checkout@v4
+        with:
+          repository: nvaccess/nvda
+          ref: release-2026.3.1
+          path: nvda
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install Python 3.13.17 x64
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13.17"
+          architecture: x64
+          update-environment: true
+
+      - name: Install Python 3.13.17 x86 for NVDA build helpers
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13.17"
+          architecture: x86
+          update-environment: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.13.5"
+          python-version: cpython-3.13.17-windows-x86_64-none
+
+      - name: Install Robot audit dependencies
+        shell: pwsh
+        run: python -m pip install robotframework==7.5 robotremoteserver==1.1.1 robotframework-screencaplibrary==1.6.0 pywin32 pyautogui pyperclip uiautomation==2.0.29
+
+      - name: Apply generic UIA math patch to NVDA source
+        shell: pwsh
+        run: |
+          $source = Get-Content "qt-math-a11y/nvda-generic-uia-math.patch" -Raw
+          $patchFile = Join-Path $env:RUNNER_TEMP "nvda-generic-uia-math-lf.patch"
+          [IO.File]::WriteAllText(
+            $patchFile,
+            $source.Replace(([char]13).ToString() + ([char]10).ToString(), ([char]10).ToString()),
+            [Text.UTF8Encoding]::new($false)
+          )
+          Push-Location nvda
+          try {
+            git apply --check $patchFile
+            if ($LASTEXITCODE -ne 0) { throw "Generic NVDA UIA math patch does not apply" }
+            git apply $patchFile
+            if ($LASTEXITCODE -ne 0) { throw "Generic NVDA UIA math patch failed" }
+            git diff --check
+          } finally { Pop-Location }
+
+      - name: Prepare patched NVDA source tree
+        shell: cmd
+        working-directory: nvda
+        run: scons.bat source --all-cores
+
+      - name: Give NVDA test speech synthesizer a nonzero MathCAT rate
+        shell: pwsh
+        run: |
+          python anki-a11y/patch_nvda_spy_rate.py nvda/tests/system/libraries/SystemTestSpy/speechSpySynthDriver.py
+          if ($LASTEXITCODE -ne 0) { throw "Cannot patch source-test synthesizer rate" }
+
+      - name: Add read-only raw Qt UIA diagnostic
+        shell: pwsh
+        run: |
+          python qt-math-a11y/patch_nvda_math_diagnostic.py nvda/tests/system/libraries/SystemTestSpy/speechSpyGlobalPlugin.py
+          if ($LASTEXITCODE -ne 0) { throw "Cannot add read-only Qt/UIA math diagnostic" }
+          $spy = Get-Content nvda/tests/system/libraries/SystemTestSpy/speechSpyGlobalPlugin.py -Raw
+          if ($spy.Contains("_AnkiQtMathBridge") -or $spy.Contains("ANKI_QT_MATH_BRIDGE applied")) {
+            throw "Experimental Anki MathML bridge leaked into production audit"
+          }
+
+      - name: Register Anki and Chrome MathCAT tests in NVDA Robot harness
+        shell: pwsh
+        run: |
+          Copy-Item anki-a11y/AnkiNvdaTests.py nvda/tests/system/robot/
+          Copy-Item anki-a11y/ankiNvda.robot nvda/tests/system/robot/
+          Copy-Item anki-a11y/MathCATChromeControl.py nvda/tests/system/robot/
+          Copy-Item anki-a11y/ankiChromeMathcat.robot nvda/tests/system/robot/
+
+      - name: Run native Anki plus NVDA MathCAT audit
+        shell: pwsh
+        env:
+          ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\native-a11y
+          ANKI_A11Y_ADDON_SOURCE: ${{ github.workspace }}\anki-a11y\anki-accessibility-prototype
+          ANKI_A11Y_FIXTURE_SOURCE: ${{ github.workspace }}\anki-a11y\anki-fixture-loader
+          ANKI_A11Y_CI: '1'
+          ANKI_A11Y_RICH_FOCUS: 'true'
+          ANKI_A11Y_MATH_VARIANT: native
+          ANKI_A11Y_QT_TRANSPORT: production
+          ANKI_A11Y_FIXTURE_FILTER: Math,MathExponent,MathEquation
+        run: |
+          New-Item -ItemType Directory -Force out/native-a11y | Out-Null
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:source --include anki --outputdir ../out/native-a11y tests/system/robot/ankiNvda.robot
+            if ($LASTEXITCODE -ne 0) { throw "Native Anki/NVDA Robot suite exit $LASTEXITCODE" }
+          } finally { Pop-Location }
+
+      - name: Require native transport semantic evidence
+        shell: pwsh
+        run: |
+          $file = "out/native-a11y/semantic-audit.json"
+          if (-not (Test-Path $file)) { throw "No semantic-audit.json produced" }
+          $data = Get-Content $file -Raw | ConvertFrom-Json
+          $native = @($data.tests | Where-Object {
+            $_.criterion -in @(
+              "qt_native_raw_transport",
+              "qt_native_no_marker_or_bridge",
+              "nvda_generic_uia_mathml_delivered",
+              "mathcat_interactive_navigation",
+              "mathcat_deep_component_navigation"
+            )
+          })
+          $failed = @($native | Where-Object { -not $_.passed })
+          Write-Host "Native production criteria: $($native.Count); failed: $($failed.Count)"
+          $native | ForEach-Object {
+            Write-Host "$($_.kind) $($_.criterion): $($_.passed)"
+          }
+          if ($native.Count -lt 15) {
+            throw "Expected five native math criteria across three fixtures; observed only $($native.Count)"
+          }
+          if ($failed.Count -gt 0) {
+            $failed | ConvertTo-Json -Depth 8 | Write-Host
+            throw "Native Qt/NVDA math transport is not proven"
+          }
+
+      - name: Control experiment with Chrome and the same patched source NVDA
+        shell: pwsh
+        env:
+          ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\native-a11y
+        run: |
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:source --include mathcat --outputdir ../out/native-a11y --output chrome-output.xml --log chrome-log.html --report chrome-report.html tests/system/robot/ankiChromeMathcat.robot
+            if ($LASTEXITCODE -ne 0) { throw "Chrome MathCAT control exit $LASTEXITCODE" }
+          } finally { Pop-Location }
+
+      - name: Verify ordinary Anki keyboard navigation without a screen reader
+        shell: pwsh
+        env:
+          ANKI_A11Y_OUTPUT: ${{ github.workspace }}\out\native-a11y
+        run: |
+          python anki-a11y/AnkiNoAtKeyboard.py
+          if ($LASTEXITCODE -ne 0) { throw "No-reader keyboard regression test failed" }
+
+      - name: Upload native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anki-native-qt-math-nvda-evidence
+          if-no-files-found: warn
+          path: |
+            out/native-a11y/speech.json
+            out/native-a11y/semantic-audit.json
+            out/native-a11y/chrome-mathcat-control.json
+            out/native-a11y/chrome-output.xml
+            out/native-a11y/chrome-log.html
+            out/native-a11y/nvdaTestRunLogs/
+            out/native-a11y/anki-startup.log
+            out/native-a11y/no-at-keyboard.json
+            out/native-a11y/runtime-original-hashes/
+            out/native-a11y/output.xml
+            out/native-a11y/log.html
+            out/native-a11y/report.html
+            out/native-a11y/systemTests.xml
