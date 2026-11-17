@@ -18,6 +18,7 @@ jobs:
     env:
       QT_VERSION: "6.11.2"
       QT_ARCH: "win64_msvc2022_64"
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - name: Checkout audit branch
         uses: actions/checkout@v4
@@ -82,6 +83,11 @@ jobs:
           "WIN_FLEX=$winFlex" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "WIN_BISON=$winBison" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "GPERF_EXE=$gperf" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Enable persistent C++ compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
 
       - name: Report required toolchain versions
         shell: pwsh
@@ -155,6 +161,9 @@ jobs:
               "-DFEATURE_qtpdf_build=OFF",
               "-DFEATURE_qtwebengine_widgets_build=OFF",
               "-DFEATURE_qtwebengine_quick_build=OFF",
+              "-DFEATURE_webengine_precompiled_headers=OFF",
+              "-DCMAKE_C_COMPILER_LAUNCHER=sccache",
+              "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache",
               "-DFEATURE_webengine_webrtc=OFF",
               "-DFEATURE_webengine_printing_and_pdf=OFF",
               "-DFEATURE_webengine_extensions=OFF",
@@ -203,6 +212,12 @@ jobs:
             Write-Host "WebEngineCore target generated successfully."
           } finally { Pop-Location }
 
+      - name: Show sccache state before Chromium build
+        shell: pwsh
+        run: |
+          sccache --show-stats
+          sccache --zero-stats
+
       - name: Build patched Qt WebEngine Core
         shell: pwsh
         env:
@@ -218,6 +233,11 @@ jobs:
           Copy-Item $dll.FullName out\webengine\Qt6WebEngineCore.dll
           Get-FileHash out\webengine\Qt6WebEngineCore.dll -Algorithm SHA256 | Format-List | Out-String | Set-Content out\webengine\sha256.txt
           Get-Content out\webengine\sha256.txt
+
+      - name: Show sccache state after Chromium build
+        if: always()
+        shell: pwsh
+        run: sccache --show-stats
 
       - name: Upload patched WebEngine runtime
         if: always()
