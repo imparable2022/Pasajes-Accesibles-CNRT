@@ -155,6 +155,14 @@ jobs:
               "-DFEATURE_qtpdf_build=OFF",
               "-DFEATURE_qtwebengine_widgets_build=OFF",
               "-DFEATURE_qtwebengine_quick_build=OFF",
+              "-DFEATURE_webengine_webrtc=OFF",
+              "-DFEATURE_webengine_printing_and_pdf=OFF",
+              "-DFEATURE_webengine_extensions=OFF",
+              "-DFEATURE_webengine_pepper_plugins=OFF",
+              "-DFEATURE_webengine_spellchecker=OFF",
+              "-DFEATURE_webengine_vulkan=OFF",
+              "-DFEATURE_webenginedriver=OFF",
+              "-DFEATURE_webengine_kerberos=OFF",
               "-DFLEX_EXECUTABLE=$env:WIN_FLEX",
               "-DBISON_EXECUTABLE=$env:WIN_BISON",
               "-DGPerf_EXECUTABLE=$env:GPERF_EXE"
@@ -168,6 +176,23 @@ jobs:
             Write-Host $summary
             if ($summary -match "QtWebEngine won't be built" -or $summary -match "configure errors were found") {
               throw "Qt WebEngine was disabled during configuration"
+            }
+
+            # This runtime is intentionally lean for the accessibility proof.
+            # None of these optional Chromium subsystems are needed by the
+            # MathJax/Qt accessibility transport under test.
+            foreach ($disabledFeature in @(
+              "FEATURE_webengine_webrtc",
+              "FEATURE_webengine_printing_and_pdf",
+              "FEATURE_webengine_extensions",
+              "FEATURE_webengine_pepper_plugins",
+              "FEATURE_webengine_spellchecker",
+              "FEATURE_webengine_vulkan",
+              "FEATURE_webenginedriver",
+              "FEATURE_webengine_kerberos"
+            )) {
+              $entry = Select-String -Path CMakeCache.txt -Pattern "^$disabledFeature:BOOL=OFF$"
+              if (-not $entry) { throw "Lean accessibility build did not disable $disabledFeature" }
             }
 
             $targets = ninja -t targets all
@@ -184,7 +209,7 @@ jobs:
           NINJAFLAGS: "-j4"
           QTWEBENGINE_GN_THREADS: "4"
         run: |
-          cmake --build web-build --parallel 4 --target WebEngineCore
+          cmake --build web-build --config RelWithDebInfo --parallel 4 --target WebEngineCore
           if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine Core build failed" }
           $dll = Get-ChildItem web-build -Recurse -Filter Qt6WebEngineCore.dll -File | Sort-Object FullName | Select-Object -First 1
           if (-not $dll) { throw "Patched Qt6WebEngineCore.dll was not produced" }
