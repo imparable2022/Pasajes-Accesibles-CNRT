@@ -191,7 +191,7 @@ jobs:
               "FEATURE_webenginedriver",
               "FEATURE_webengine_kerberos"
             )) {
-              $entry = Select-String -Path CMakeCache.txt -Pattern "^$disabledFeature:BOOL=OFF$"
+              $entry = Select-String -Path CMakeCache.txt -Pattern "^${disabledFeature}:BOOL=OFF$"
               if (-not $entry) { throw "Lean accessibility build did not disable $disabledFeature" }
             }
 
