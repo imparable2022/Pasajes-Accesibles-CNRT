@@ -30,7 +30,7 @@ index 31ea541..7583352 100644
      case QAccessible::TextInterface:
          if (q->HasState(ax::mojom::State::kEditable))
              return static_cast<QAccessibleTextInterface*>(this);
-@@ -428,6 +435,27 @@ void BrowserAccessibilityInterface::setText(QAccessible::Text t, const QString &
+@@ -428,6 +435,28 @@ void BrowserAccessibilityInterface::setText(QAccessible::Text t, const QString &
  {
  }
  
