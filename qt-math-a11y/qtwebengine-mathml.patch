@@ -52,7 +52,8 @@ index 31ea541..7583352 100644
 +    const QString inner = toQt(q->GetStringAttribute(ax::mojom::StringAttribute::kMathContent));
 +    if (inner.isEmpty())
 +        return {};
-+    return QStringLiteral("<math>") + inner + QStringLiteral("</math>");
++    const QString mathMl = QStringLiteral("<math>") + inner + QStringLiteral("</math>");
++    return QVariant(mathMl);
 +}
 +
  QRect BrowserAccessibilityInterface::rect() const
