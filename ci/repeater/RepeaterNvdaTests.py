@@ -68,8 +68,8 @@ def start_repeater():
     global proc
     assert exe.is_file(), f"Missing compiled Repeater: {exe}"
     cards.write_text(
-        "Q: What is the accessibility audit question?\\n"
-        "A: The accessible answer is forty two.\\n",
+        "Q: What is the accessibility audit question?\n"
+        "A: The accessible answer is forty two.\n",
         encoding="utf-8",
     )
     command = (
