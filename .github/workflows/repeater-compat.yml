@@ -135,8 +135,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-          cache: pip
-          cache-dependency-path: nvda/requirements.txt
       - name: Install NVDA Robot Framework dependencies
         shell: pwsh
         run: python -m pip install robotframework==7.5 robotremoteserver==1.1.1 robotframework-screencaplibrary==1.6.0 pywin32 uiautomation==2.0.29 pyautogui pyperclip
