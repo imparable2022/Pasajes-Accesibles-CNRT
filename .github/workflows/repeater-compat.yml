@@ -102,3 +102,97 @@ jobs:
             repeater/target/release/repeater.exe.sha256
           if-no-files-found: error
           retention-days: 14
+
+  nvda-real-console:
+    name: NVDA live speech + keyboard / Windows 2025
+    needs: build-and-test
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - name: Checkout test harness
+        uses: actions/checkout@v4
+      - name: Download EXACT compiled and previously tested EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: repeater-windows-keyboard-compat-${{ github.run_id }}
+          path: repeater-artifact
+      - name: Confirm executable and checksum
+        shell: pwsh
+        run: |
+          $exe = 'repeater-artifact/repeater.exe'
+          $expected = ((Get-Content 'repeater-artifact/repeater.exe.sha256' -Raw).Trim() -split ' ')[0]
+          $actual = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          if ($expected -ne $actual) { throw 'EXE SHA256 mismatch' }
+          & $exe --version
+      - name: Get official NVDA test framework
+        uses: actions/checkout@v4
+        with:
+          repository: nvaccess/nvda
+          ref: release-2026.3.1
+          path: nvda
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: nvda/requirements.txt
+      - name: Install NVDA Robot Framework dependencies
+        shell: pwsh
+        run: python -m pip install robotframework==7.5 robotremoteserver==1.1.1 robotframework-screencaplibrary==1.6.0 pywin32 uiautomation==2.0.29 pyautogui pyperclip
+      - name: Fetch and verify official NVDA installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force nvda-installer | Out-Null
+          $file = Join-Path (Resolve-Path nvda-installer).Path 'nvda_2026.3.1.exe'
+          Invoke-WebRequest -Uri 'https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe' -OutFile $file
+          $expected = '6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052'
+          if ((Get-FileHash $file -Algorithm SHA256).Hash -ine $expected) { throw 'NVDA installer checksum mismatch' }
+      - name: Install NVDA using the official system test installer
+        shell: pwsh
+        run: |
+          $env:nvdaLauncherDir = (Resolve-Path nvda-installer).Path
+          New-Item -ItemType Directory -Force nvda/testOutput/install | Out-Null
+          Push-Location nvda
+          try {
+            ./ci/scripts/installNVDA.ps1
+            if ($LASTEXITCODE -ne 0) { throw "NVDA installation failed $LASTEXITCODE" }
+          } finally { Pop-Location }
+      - name: Register real NVDA console audit
+        shell: pwsh
+        run: |
+          Copy-Item ci/repeater/RepeaterNvdaTests.py nvda/tests/system/robot/
+          Copy-Item ci/repeater/repeaterNvda.robot nvda/tests/system/robot/
+      - name: Run true NVDA speech-spy console test
+        shell: pwsh
+        env:
+          REPEATER_NVDA_OUTPUT: ${{ github.workspace }}\\out\\repeater-nvda
+          REPEATER_EXE: ${{ github.workspace }}\\repeater-artifact\\repeater.exe
+        run: |
+          New-Item -ItemType Directory -Force out/repeater-nvda | Out-Null
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include repeater --outputdir ../out/repeater-nvda tests/system/robot/repeaterNvda.robot
+            if ($LASTEXITCODE -ne 0) { throw "Repeater NVDA spoken-output assertion failed: $LASTEXITCODE" }
+          } finally { Pop-Location }
+      - name: Summarize actual NVDA speech, including failures
+        if: always()
+        shell: pwsh
+        run: |
+          $file = 'out/repeater-nvda/repeater-speech.json'
+          if (Test-Path $file) {
+            $speech = Get-Content $file -Raw | ConvertFrom-Json
+            $speech.events | Select-Object stage,key,speech,passed | Format-List | Out-String | Write-Host
+          } else {
+            Write-Warning 'No NVDA speech evidence produced'
+          }
+      - name: Upload evidence even when speech assertions fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repeater-real-nvda-evidence-${{ github.run_id }}
+          path: |
+            out/repeater-nvda/
+            nvda/testOutput/system/*.log
+          if-no-files-found: warn
+          retention-days: 14
