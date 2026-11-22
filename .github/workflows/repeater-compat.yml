@@ -1,0 +1,98 @@
+name: Repeater - Windows keyboard compatibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/repeater-windows-keyboard-20261121
+    paths:
+      - ".github/workflows/repeater-compat.yml"
+      - "ci/repeater/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repeater-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            label: Windows compile + tests + artifact
+            release: true
+          - os: ubuntu-24.04
+            label: Linux compile + tests
+            release: false
+    steps:
+      - name: Checkout CI host repository
+        uses: actions/checkout@v4
+      - name: Checkout pinned Repeater upstream
+        uses: actions/checkout@v4
+        with:
+          repository: shaankhosla/repeater
+          ref: 02901f1e62b50376ab090843c77087f9a7de75c1
+          path: repeater
+          persist-credentials: false
+      - name: Apply and assert keyboard compatibility patch
+        run: python ci/repeater/patch_windows_keyboard.py
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Cache Rust registry, dependencies and incremental compilation
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: repeater
+          key: repeater-pinned-02901f1e-windows-keyboard-v1
+          cache-on-failure: true
+      - name: Check formatting
+        working-directory: repeater
+        run: cargo fmt --all -- --check
+      - name: Test (parallel Rust compilation)
+        working-directory: repeater
+        env:
+          CARGO_BUILD_JOBS: "4"
+          CARGO_INCREMENTAL: "0"
+        run: cargo test --locked --all-targets
+      - name: Compile release (Windows executable)
+        if: matrix.release
+        working-directory: repeater
+        env:
+          CARGO_BUILD_JOBS: "4"
+          CARGO_INCREMENTAL: "0"
+        run: cargo build --locked --release
+      - name: CLI smoke test
+        if: matrix.release
+        shell: pwsh
+        working-directory: repeater
+        run: |
+          & ./target/release/repeater.exe --version
+          & ./target/release/repeater.exe drill --help
+          & ./target/release/repeater.exe create --help
+      - name: Generate SHA256 and execution evidence
+        if: matrix.release
+        shell: pwsh
+        working-directory: repeater
+        run: |
+          $file = "target/release/repeater.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
+          "$hash  repeater.exe" | Out-File -FilePath "target/release/repeater.exe.sha256" -Encoding utf8
+          "Repeater SHA256: $hash" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - name: Upload Windows executable and checksum
+        if: matrix.release
+        uses: actions/upload-artifact@v4
+        with:
+          name: repeater-windows-keyboard-compat-${{ github.run_id }}
+          path: |
+            repeater/target/release/repeater.exe
+            repeater/target/release/repeater.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
