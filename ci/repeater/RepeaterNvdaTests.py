@@ -87,31 +87,91 @@ def start_repeater():
         record("WINDOW_TITLE_NOT_SPOKEN", speech=speech)
 
 
+def probe_console_uia(stage):
+    """Independent control: inspect actual UI Automation text, not NVDA speech."""
+    import win32gui
+    try:
+        import uiautomation as auto
+        matches = []
+        def callback(hwnd, _):
+            if win32gui.IsWindowVisible(hwnd) and "Repeater NVDA Audit" in win32gui.GetWindowText(hwnd):
+                matches.append(hwnd)
+        win32gui.EnumWindows(callback, None)
+        if not matches:
+            record("UIA_PROBE", stage_name=stage, error="Console hwnd not found")
+            return
+        ctrl = auto.ControlFromHandle(matches[-1])
+        data = dict(name=ctrl.Name, control_type=ctrl.ControlTypeName)
+        try:
+            pattern = ctrl.GetTextPattern()
+            data["text"] = pattern.DocumentRange.GetText(-1)[:4500] if pattern else None
+        except Exception as exc:
+            data["text_error"] = repr(exc)
+        record("UIA_PROBE", stage_name=stage, **data)
+    except Exception as exc:
+        record("UIA_PROBE", stage_name=stage, error=repr(exc))
+
+
+def review_console(stage, needle):
+    """Try genuine NVDA desktop/laptop review commands independently.
+
+    Previous run only tried Say All and one Next Line while positioned at
+    the bottom border of the console, which cannot prove text inaccessible.
+    """
+    observed = []
+    for name, combo in [
+        ("FOCUS", "NVDA+tab"),
+        ("OBJECT_REVIEW_CURRENT", "numpad8"),
+        ("OBJECT_REVIEW_TOP", "shift+numpad7"),
+        ("OBJECT_REVIEW_FIRST", "numpad8"),
+    ]:
+        observed.append(key(stage + "_" + name, combo, .4))
+    for n in range(28):
+        observed.append(key(f"{stage}_REVIEW_NEXT_{n+1:02d}", "numpad9", .22))
+        if needle in " ".join(observed).casefold():
+            break
+    # Also test reverse review, laptop mappings and a separate say-all.
+    if needle not in " ".join(observed).casefold():
+        for name, combo in [
+            ("BOTTOM", "shift+numpad9"),
+            ("PREVIOUS", "numpad7"),
+            ("LAPTOP_TOP", "NVDA+control+home"),
+            ("LAPTOP_NEXT", "NVDA+downArrow"),
+            ("LAPTOP_CURRENT", "NVDA+shift+."),
+            ("SAY_ALL_REVIEW", "numpadPlus"),
+        ]:
+            observed.append(key(stage + "_" + name, combo, .8))
+    passed = needle in " ".join(observed).casefold()
+    record(stage + "_RESULT", passed=passed, tested="NVDA review cursor and laptop alternatives",
+           searched=needle, speech_excerpt=" ".join(observed)[-2500:])
+    return passed
+
+
 def read_question_with_nvda():
-    # Ask NVDA to read the actual console, as an end user would.
-    result = []
-    result.append(key("QUESTION_SAY_ALL", "NVDA+downArrow", 4.0))
-    result.append(key("QUESTION_FOCUS_REPORT", "NVDA+tab", 1.5))
-    combined = " ".join(result).casefold()
-    if "accessibility audit question" not in combined:
-        record("QUESTION_NOT_SPOKEN", observed=combined[:2500])
-        raise AssertionError("NVDA did not speak Repeater's question; inspect speech evidence.")
-    record("QUESTION_SPOKEN", passed=True)
+    global question_read
+    probe_console_uia("QUESTION")
+    question_read = review_console("QUESTION", "accessibility audit question")
+    if not question_read:
+        record("QUESTION_NOT_SPOKEN", reason="Question absent from all recorded real-NVDA review speech")
 
 
 def reveal_answer_with_keyboard():
-    key("REVEAL_ANSWER", "space", 1.5)
-    spoken = key("ANSWER_SAY_ALL", "NVDA+downArrow", 4.0).casefold()
-    if "accessible answer is forty two" not in spoken:
-        record("ANSWER_NOT_SPOKEN", observed=spoken[:2500])
-        raise AssertionError("NVDA did not speak the revealed answer.")
-    record("ANSWER_SPOKEN", passed=True)
+    global answer_read
+    key("REVEAL_ANSWER", "space", 1.2)
+    probe_console_uia("ANSWER")
+    answer_read = review_console("ANSWER", "accessible answer is forty two")
+    if not answer_read:
+        record("ANSWER_NOT_SPOKEN", reason="Answer absent from all recorded real-NVDA review speech")
 
 
 def grade_and_exit_with_keyboard():
-    key("GRADE_PASS", "enter", 2.0)
-    key("WINDOW_AFTER_GRADE", "NVDA+t", 1.0)
-    record("GRADE_INPUT_SENT", note="Keys sent; no database success assumed")
+    key("GRADE_PASS", "enter", 1.0)
+    record("GRADE_INPUT_SENT", note="Key sent; no database success assumed")
+    if not question_read or not answer_read:
+        raise AssertionError(
+            f"NVDA accessibility gate failed: question_read={question_read} "
+            f"answer_read={answer_read}. Inspect actual speech and UIA evidence."
+        )
 
 
 def stop_repeater():
