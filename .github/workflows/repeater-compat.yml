@@ -47,6 +47,8 @@ jobs:
           persist-credentials: false
       - name: Apply and assert keyboard compatibility patch
         run: python ci/repeater/patch_windows_keyboard.py
+      - name: Add accessible line-oriented study mode
+        run: python ci/repeater/patch_accessible.py
       - name: Set up Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -75,6 +77,12 @@ jobs:
           CARGO_BUILD_JOBS: "4"
           CARGO_INCREMENTAL: "0"
         run: cargo build --locked --release
+      - name: Black-box accessible mode and FSRS database persistence
+        if: matrix.release
+        shell: pwsh
+        env:
+          REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
+        run: python ci/repeater/test_accessible.py
       - name: CLI smoke test
         if: matrix.release
         shell: pwsh
