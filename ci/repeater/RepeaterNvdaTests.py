@@ -88,7 +88,7 @@ def start_repeater():
 
 
 def probe_console_uia(stage):
-    """Independent control: inspect actual UI Automation text, not NVDA speech."""
+    """Inspect actual UI Automation children and text patterns independently."""
     import win32gui
     try:
         import uiautomation as auto
@@ -100,14 +100,31 @@ def probe_console_uia(stage):
         if not matches:
             record("UIA_PROBE", stage_name=stage, error="Console hwnd not found")
             return
-        ctrl = auto.ControlFromHandle(matches[-1])
-        data = dict(name=ctrl.Name, control_type=ctrl.ControlTypeName)
-        try:
-            pattern = ctrl.GetTextPattern()
-            data["text"] = pattern.DocumentRange.GetText(-1)[:4500] if pattern else None
-        except Exception as exc:
-            data["text_error"] = repr(exc)
-        record("UIA_PROBE", stage_name=stage, **data)
+        root = auto.ControlFromHandle(matches[-1])
+        nodes = [(root, 0)]
+        report = []
+        while nodes and len(report) < 30:
+            ctrl, depth = nodes.pop(0)
+            item = dict(depth=depth, name=ctrl.Name, control_type=ctrl.ControlTypeName)
+            try:
+                pat = ctrl.GetPattern(auto.PatternId.TextPattern)
+                if pat:
+                    item["text"] = pat.DocumentRange.GetText(-1)[:3500]
+            except Exception as exc:
+                item["text_error"] = repr(exc)[:200]
+            try:
+                val = ctrl.GetPattern(auto.PatternId.ValuePattern)
+                if val:
+                    item["value"] = str(val.Value)[:3500]
+            except Exception:
+                pass
+            report.append(item)
+            if depth < 4:
+                try:
+                    nodes.extend((child, depth + 1) for child in ctrl.GetChildren()[:18])
+                except Exception as exc:
+                    item["children_error"] = repr(exc)[:200]
+        record("UIA_PROBE", stage_name=stage, controls=report)
     except Exception as exc:
         record("UIA_PROBE", stage_name=stage, error=repr(exc))
 
