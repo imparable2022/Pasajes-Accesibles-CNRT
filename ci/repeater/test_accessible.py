@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix="repeater-accessible-") as folder:
         encoding="utf-8",
     )
     env = dict(os.environ, REPEATER_DATA_DIR=str(root / "data"), NO_COLOR="1")
-    cmd = [str(exe), "drill", "--accessible", "--shuffle=false", str(deck)]
+    cmd = [str(exe), "drill", "--accessible", str(deck)]
     proc = subprocess.run(cmd, input="\n\nq\n", text=True, capture_output=True, env=env, timeout=30)
     print("EXE:", exe)
     print("STDOUT:", proc.stdout)
