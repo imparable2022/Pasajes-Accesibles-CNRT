@@ -169,7 +169,10 @@ jobs:
         run: |
           Copy-Item ci/repeater/RepeaterNvdaTests.py nvda/tests/system/robot/
           Copy-Item ci/repeater/repeaterNvda.robot nvda/tests/system/robot/
-      - name: Run true NVDA speech-spy console test
+          Copy-Item ci/repeater/AccessibleRepeaterNvdaTests.py nvda/tests/system/robot/
+          Copy-Item ci/repeater/repeaterAccessibleNvda.robot nvda/tests/system/robot/
+      - name: Run legacy TUI NVDA diagnostic (non-blocking)
+        continue-on-error: true
         shell: pwsh
         env:
           REPEATER_NVDA_OUTPUT: ${{ github.workspace }}\\out\\repeater-nvda
@@ -181,6 +184,19 @@ jobs:
             python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include repeater --outputdir ../out/repeater-nvda tests/system/robot/repeaterNvda.robot
             if ($LASTEXITCODE -ne 0) { throw "Repeater NVDA spoken-output assertion failed: $LASTEXITCODE" }
           } finally { Pop-Location }
+      - name: Real NVDA accessible mode and independent SQLite grade
+        if: always()
+        shell: pwsh
+        env:
+          REPEATER_NVDA_OUTPUT: ${{ github.workspace }}\\out\\repeater-nvda
+          REPEATER_EXE: ${{ github.workspace }}\\repeater-artifact\\repeater.exe
+        run: |
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include repeaterAccessible --outputdir ../out/repeater-nvda --output accessible-output.xml --log accessible-log.html --report accessible-report.html tests/system/robot/repeaterAccessibleNvda.robot
+            if ($LASTEXITCODE -ne 0) { throw "Accessible NVDA test or database assertion failed: $LASTEXITCODE" }
+          } finally { Pop-Location }
+
       - name: Summarize actual NVDA speech, including failures
         if: always()
         shell: pwsh
