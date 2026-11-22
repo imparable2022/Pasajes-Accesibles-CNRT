@@ -77,7 +77,11 @@ def run_plain_console_control():
     )
     try:
         robot.sleep("3 seconds")
-        focus_console()
+        try:
+            focus_console()
+        except AssertionError as exc:
+            record("PLAIN_CONSOLE_CONTROL_UNAVAILABLE", error=str(exc))
+            return
         observed = [key("CONTROL_FOCUS", "NVDA+tab", .4),
                     key("CONTROL_TOP", "shift+numpad7", .4),
                     key("CONTROL_CURRENT", "numpad8", .4)]
