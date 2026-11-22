@@ -64,9 +64,43 @@ def focus_console():
     robot.sleep("2 seconds")
 
 
+def run_plain_console_control():
+    """Control test: if even plain PowerShell is unreadable, runner may be limiting NVDA."""
+    marker = "PLAIN CONSOLE SCREEN READER CONTROL"
+    cmd = (
+        "$Host.UI.RawUI.WindowTitle = 'Repeater NVDA Audit'; "
+        "Write-Output '" + marker + "'"
+    )
+    baseline = subprocess.Popen(
+        ["powershell.exe", "-NoProfile", "-NoExit", "-Command", cmd],
+        creationflags=subprocess.CREATE_NEW_CONSOLE,
+    )
+    try:
+        robot.sleep("3 seconds")
+        focus_console()
+        observed = [key("CONTROL_FOCUS", "NVDA+tab", .4),
+                    key("CONTROL_TOP", "shift+numpad7", .4),
+                    key("CONTROL_CURRENT", "numpad8", .4)]
+        for i in range(15):
+            observed.append(key(f"CONTROL_NEXT_{i:02d}", "numpad9", .2))
+            if marker.casefold() in " ".join(observed).casefold():
+                break
+        record("PLAIN_CONSOLE_CONTROL_RESULT",
+               passed=marker.casefold() in " ".join(observed).casefold(),
+               excerpts=" ".join(observed)[-2000:])
+    finally:
+        baseline.terminate()
+        try:
+            baseline.wait(timeout=6)
+        except subprocess.TimeoutExpired:
+            baseline.kill()
+        robot.sleep("1 second")
+
+
 def start_repeater():
     global proc
     assert exe.is_file(), f"Missing compiled Repeater: {exe}"
+    run_plain_console_control()
     cards.write_text(
         "Q: What is the accessibility audit question?\n"
         "A: The accessible answer is forty two.\n",
