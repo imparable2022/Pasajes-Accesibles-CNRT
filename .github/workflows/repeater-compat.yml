@@ -1,0 +1,245 @@
+name: Repeater - Windows keyboard compatibility
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/repeater-compat.yml"
+      - "ci/repeater/**"
+  push:
+    branches:
+      - ci/repeater-windows-keyboard-20261121
+    paths:
+      - ".github/workflows/repeater-compat.yml"
+      - "ci/repeater/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repeater-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            label: Windows compile + tests + artifact
+            release: true
+          - os: ubuntu-24.04
+            label: Linux compile + tests
+            release: false
+    steps:
+      - name: Checkout CI host repository
+        uses: actions/checkout@v4
+      - name: Checkout pinned Repeater upstream
+        uses: actions/checkout@v4
+        with:
+          repository: shaankhosla/repeater
+          ref: 02901f1e62b50376ab090843c77087f9a7de75c1
+          path: repeater
+          persist-credentials: false
+      - name: Apply and assert keyboard compatibility patch
+        run: python ci/repeater/patch_windows_keyboard.py
+      - name: Add accessible line-oriented study mode
+        run: python ci/repeater/patch_accessible.py
+      - name: Add four-grade FSRS history and optimizer
+        run: python ci/repeater/patch_fsrs_anki_style.py
+      - name: Translate Repeater into Spanish and offer choice between study rounds
+        run: python ci/repeater/patch_spanish_and_round_choice.py
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Cache Rust registry, dependencies and incremental compilation
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: repeater
+          key: repeater-pinned-02901f1e-windows-keyboard-v1
+          cache-on-failure: true
+      - name: Format patched Rust source and validate formatting
+        working-directory: repeater
+        run: |
+          cargo fmt --all
+          cargo fmt --all -- --check
+      - name: Test (parallel Rust compilation)
+        working-directory: repeater
+        env:
+          CARGO_BUILD_JOBS: "4"
+          CARGO_INCREMENTAL: "0"
+        run: cargo test --locked --all-targets
+      - name: Compile release (Windows executable)
+        if: matrix.release
+        working-directory: repeater
+        env:
+          CARGO_BUILD_JOBS: "4"
+          CARGO_INCREMENTAL: "0"
+        run: cargo build --locked --release
+      - name: Black-box accessible mode and FSRS database persistence
+        if: matrix.release
+        shell: pwsh
+        env:
+          REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
+        run: python ci/repeater/test_accessible.py
+      - name: Four ratings and personalized FSRS optimizer end-to-end
+        if: matrix.release
+        shell: pwsh
+        env:
+          REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
+        run: python ci/repeater/test_fsrs_four_ratings.py
+
+      - name: Study actual 105 mathematics cards on Windows and verify FSRS persistence
+        if: matrix.release
+        shell: pwsh
+        env:
+          REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
+        run: python ci/repeater/test_matematica_105.py
+
+      - name: Spanish prompts and optional repetition rounds
+        if: matrix.release
+        shell: pwsh
+        env:
+          REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
+        run: python ci/repeater/test_round_choice_spanish.py
+
+      - name: CLI smoke test
+        if: matrix.release
+        shell: pwsh
+        working-directory: repeater
+        run: |
+          & ./target/release/repeater.exe --version
+          & ./target/release/repeater.exe drill --help
+          & ./target/release/repeater.exe create --help
+      - name: Generate SHA256 and execution evidence
+        if: matrix.release
+        shell: pwsh
+        working-directory: repeater
+        run: |
+          $file = "target/release/repeater.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
+          "$hash  repeater.exe" | Out-File -FilePath "target/release/repeater.exe.sha256" -Encoding utf8
+          "Repeater SHA256: $hash" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - name: Upload Windows executable and checksum
+        if: matrix.release
+        uses: actions/upload-artifact@v4
+        with:
+          name: repeater-windows-keyboard-compat-${{ github.run_id }}
+          path: |
+            repeater/target/release/repeater.exe
+            repeater/target/release/repeater.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  nvda-real-console:
+    name: NVDA live speech + keyboard / Windows 2025
+    needs: build-and-test
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - name: Checkout test harness
+        uses: actions/checkout@v4
+      - name: Download EXACT compiled and previously tested EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: repeater-windows-keyboard-compat-${{ github.run_id }}
+          path: repeater-artifact
+      - name: Confirm executable and checksum
+        shell: pwsh
+        run: |
+          $exe = 'repeater-artifact/repeater.exe'
+          $expected = ((Get-Content 'repeater-artifact/repeater.exe.sha256' -Raw).Trim() -split ' ')[0]
+          $actual = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          if ($expected -ne $actual) { throw 'EXE SHA256 mismatch' }
+          & $exe --version
+      - name: Get official NVDA test framework
+        uses: actions/checkout@v4
+        with:
+          repository: nvaccess/nvda
+          ref: release-2026.3.1
+          path: nvda
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install NVDA Robot Framework dependencies
+        shell: pwsh
+        run: python -m pip install robotframework==7.5 robotremoteserver==1.1.1 robotframework-screencaplibrary==1.6.0 pywin32 uiautomation==2.0.29 pyautogui pyperclip
+      - name: Fetch and verify official NVDA installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force nvda-installer | Out-Null
+          $file = Join-Path (Resolve-Path nvda-installer).Path 'nvda_2026.3.1.exe'
+          Invoke-WebRequest -Uri 'https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe' -OutFile $file
+          $expected = '6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052'
+          if ((Get-FileHash $file -Algorithm SHA256).Hash -ine $expected) { throw 'NVDA installer checksum mismatch' }
+      - name: Install NVDA using the official system test installer
+        shell: pwsh
+        run: |
+          $env:nvdaLauncherDir = (Resolve-Path nvda-installer).Path
+          New-Item -ItemType Directory -Force nvda/testOutput/install | Out-Null
+          Push-Location nvda
+          try {
+            ./ci/scripts/installNVDA.ps1
+            if ($LASTEXITCODE -ne 0) { throw "NVDA installation failed $LASTEXITCODE" }
+          } finally { Pop-Location }
+      - name: Register real NVDA console audit
+        shell: pwsh
+        run: |
+          Copy-Item ci/repeater/RepeaterNvdaTests.py nvda/tests/system/robot/
+          Copy-Item ci/repeater/repeaterNvda.robot nvda/tests/system/robot/
+          Copy-Item ci/repeater/AccessibleRepeaterNvdaTests.py nvda/tests/system/robot/
+          Copy-Item ci/repeater/repeaterAccessibleNvda.robot nvda/tests/system/robot/
+      - name: Run legacy TUI NVDA diagnostic (non-blocking)
+        continue-on-error: true
+        shell: pwsh
+        env:
+          REPEATER_NVDA_OUTPUT: ${{ github.workspace }}\\out\\repeater-nvda
+          REPEATER_EXE: ${{ github.workspace }}\\repeater-artifact\\repeater.exe
+        run: |
+          New-Item -ItemType Directory -Force out/repeater-nvda | Out-Null
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include repeater --outputdir ../out/repeater-nvda tests/system/robot/repeaterNvda.robot
+            if ($LASTEXITCODE -ne 0) { throw "Repeater NVDA spoken-output assertion failed: $LASTEXITCODE" }
+          } finally { Pop-Location }
+      - name: Real NVDA accessible mode and independent SQLite grade
+        if: always()
+        shell: pwsh
+        env:
+          REPEATER_NVDA_OUTPUT: ${{ github.workspace }}\\out\\repeater-nvda
+          REPEATER_EXE: ${{ github.workspace }}\\repeater-artifact\\repeater.exe
+        run: |
+          Push-Location nvda
+          try {
+            python -m robot --argumentfile tests/system/robotArgs.robot --variable whichNVDA:installed --include repeaterAccessible --outputdir ../out/repeater-nvda --output accessible-output.xml --log accessible-log.html --report accessible-report.html tests/system/robot/repeaterAccessibleNvda.robot
+            if ($LASTEXITCODE -ne 0) { throw "Accessible NVDA test or database assertion failed: $LASTEXITCODE" }
+          } finally { Pop-Location }
+
+      - name: Summarize actual NVDA speech, including failures
+        if: always()
+        shell: pwsh
+        run: |
+          $file = 'out/repeater-nvda/repeater-speech.json'
+          if (Test-Path $file) {
+            $speech = Get-Content $file -Raw | ConvertFrom-Json
+            $speech.events | Select-Object stage,key,speech,passed | Format-List | Out-String | Write-Host
+          } else {
+            Write-Warning 'No NVDA speech evidence produced'
+          }
+      - name: Upload evidence even when speech assertions fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repeater-real-nvda-evidence-${{ github.run_id }}
+          path: |
+            out/repeater-nvda/
+            nvda/testOutput/system/*.log
+          if-no-files-found: warn
+          retention-days: 14
