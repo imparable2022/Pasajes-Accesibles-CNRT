@@ -219,6 +219,23 @@ pairs = [
 for before, after in pairs:
     assert s.count(before) >= 1, ("drill", before, s.count(before))
     s = s.replace(before, after)
+# Ajustar las aserciones de presentación del código original al idioma visible.
+# No se alteran las pruebas de memoria FSRS ni de orden de las tarjetas.
+for original, localized in [
+    ('" Pass (See again in <15 mins)"', '" Bien (Volver a ver dentro de menos de 15 minutos)"'),
+    ('" Pass (See again in <30 mins)"', '" Bien (Volver a ver dentro de menos de 30 minutos)"'),
+    ('" Pass (See again in <12 hours)"', '" Bien (Volver a ver dentro de menos de 12 horas)"'),
+    ('" Pass (See again in <1 day)"', '" Bien (Volver a ver dentro de menos de un día)"'),
+    ('" Fail (See again in 3 days)"', '" Otra vez (Volver a ver dentro de 3 días)"'),
+    ('assert!(commands.contains("Again"));', 'assert!(commands.contains("Otra vez"));'),
+    ('assert!(commands.contains("Hard"));', 'assert!(commands.contains("Difícil"));'),
+    ('assert!(commands.contains("Good"));', 'assert!(commands.contains("Bien"));'),
+    ('assert!(commands.contains("Easy"));', 'assert!(commands.contains("Fácil"));'),
+    ('assert!(last_line.contains("Last:"));', 'assert!(last_line.contains("Última respuesta:"));'),
+    ('assert!(last_line.contains("Fail"));', 'assert!(last_line.contains("Otra vez"));'),
+]:
+    assert original in s, ("prueba de interfaz", original)
+    s = s.replace(original, localized, 1)
 # No se modifica 'Q:' o 'A:' en los archivos; siguen siendo marcadores de datos.
 p.write_text(s, encoding="utf-8")
 
