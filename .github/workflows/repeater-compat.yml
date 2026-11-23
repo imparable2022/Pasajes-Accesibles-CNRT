@@ -49,6 +49,8 @@ jobs:
         run: python ci/repeater/patch_windows_keyboard.py
       - name: Add accessible line-oriented study mode
         run: python ci/repeater/patch_accessible.py
+      - name: Add four-grade FSRS history and optimizer
+        run: python ci/repeater/patch_fsrs_anki_style.py
       - name: Set up Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
