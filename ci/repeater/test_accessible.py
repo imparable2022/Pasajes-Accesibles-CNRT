@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix="repeater-accessible-") as folder:
     assert "first accessibility question" in stdout.lower()
     assert "first accessible answer" in stdout.lower()
     assert stdout.index("first accessibility question") < stdout.index("first accessible answer")
-    assert "Review saved: Pass." in stdout, "no persisted grade acknowledgement"
+    assert "Review saved: Good." in stdout, "no persisted grade acknowledgement"
     dbpath = root / "data" / "cards.db"
     assert dbpath.is_file(), "missing SQLite database"
     with sqlite3.connect(dbpath) as db:
