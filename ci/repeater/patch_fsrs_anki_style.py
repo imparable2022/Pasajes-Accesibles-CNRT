@@ -497,7 +497,7 @@ s = s.replace(
         };""",
     """        let style = match action.action {
             ReviewStatus::Again | ReviewStatus::Fail => Theme::danger(),
-            ReviewStatus::Hard => Theme::warning(),
+            ReviewStatus::Hard => Theme::label(),
             ReviewStatus::Good | ReviewStatus::Pass | ReviewStatus::Easy => Theme::success(),
         };"""
 )
