@@ -11,7 +11,7 @@ exe = Path(os.environ["REPEATER_TEST_EXE"]).resolve()
 assert exe.is_file(), exe
 
 def run(cmd, *, env, input_text=None, timeout=120):
-    p = subprocess.run(cmd, input=input_text, text=True, capture_output=True, env=env, timeout=timeout)
+    p = subprocess.run(cmd, input=input_text, text=True, encoding="utf-8", errors="replace", capture_output=True, env=env, timeout=timeout)
     print("$", " ".join(map(str, cmd)))
     print(p.stdout)
     print(p.stderr)
@@ -32,7 +32,7 @@ for expected in (1, 2, 3, 4):
         input_text=f"\n{expected}\nq\n",
         timeout=30,
     )
-    assert "Review saved:" in p.stdout
+    assert "Repaso guardado:" in p.stdout
     with sqlite3.connect(data / "cards.db") as db:
         ratings = db.execute("SELECT rating FROM review_log ORDER BY id").fetchall()
         counts = db.execute("SELECT review_count FROM cards").fetchall()
@@ -59,7 +59,7 @@ with sqlite3.connect(dbpath) as db:
     db.commit()
 
 optimized = run([str(exe), "optimize"], env=env, timeout=240)
-assert "Optimized FSRS from" in optimized.stdout
+assert "FSRS ajustado con" in optimized.stdout
 with sqlite3.connect(dbpath) as db:
     row = db.execute(
         "SELECT parameters_json, review_count FROM fsrs_settings WHERE id=1"
