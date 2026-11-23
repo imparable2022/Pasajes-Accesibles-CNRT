@@ -7,7 +7,7 @@ from pathlib import Path
 root = Path("repeater")
 
 # 1. Database migration: durable review log + optimized parameter storage.
-migration = root / "migrations" / "0002_fsrs_review_history.sql"
+migration = root / "migrations" / "202611230001_fsrs_review_history.sql"
 migration.write_text("""\
 CREATE TABLE IF NOT EXISTS review_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -192,9 +192,11 @@ pub enum ReviewStatus {
 impl ReviewStatus {
     pub fn label(&self) -> &'static str {
         match self {
-            ReviewStatus::Again | ReviewStatus::Fail => "Again",
+            ReviewStatus::Again => "Again",
+            ReviewStatus::Fail => "Fail",
             ReviewStatus::Hard => "Hard",
-            ReviewStatus::Good | ReviewStatus::Pass => "Good",
+            ReviewStatus::Good => "Good",
+            ReviewStatus::Pass => "Pass",
             ReviewStatus::Easy => "Easy",
         }
     }
@@ -232,17 +234,20 @@ replacement = """fn early_interval_cap(review_count: usize, review_status: Revie
         0 => match review_status {
             ReviewStatus::Again | ReviewStatus::Fail => Some(Duration::minutes(1)),
             ReviewStatus::Hard => Some(Duration::minutes(5)),
-            ReviewStatus::Good | ReviewStatus::Pass => Some(Duration::minutes(10)),
+            ReviewStatus::Good => Some(Duration::minutes(10)),
+            ReviewStatus::Pass => Some(Duration::minutes(1)),
             ReviewStatus::Easy => Some(Duration::days(1)),
         },
         1 => match review_status {
             ReviewStatus::Again | ReviewStatus::Fail => Some(Duration::minutes(1)),
             ReviewStatus::Hard => Some(Duration::minutes(10)),
-            ReviewStatus::Good | ReviewStatus::Pass => Some(Duration::days(1)),
+            ReviewStatus::Good => Some(Duration::days(1)),
+            ReviewStatus::Pass => Some(Duration::minutes(10)),
             ReviewStatus::Easy => None,
         },
         2 => match review_status {
-            ReviewStatus::Again | ReviewStatus::Fail => Some(Duration::minutes(10)),
+            ReviewStatus::Again => Some(Duration::minutes(10)),
+            ReviewStatus::Fail => Some(Duration::minutes(10)),
             ReviewStatus::Hard => Some(Duration::hours(12)),
             ReviewStatus::Good | ReviewStatus::Pass => Some(Duration::days(1)),
             ReviewStatus::Easy => None,
@@ -500,6 +505,15 @@ s = s.replace(
             ReviewStatus::Hard => Theme::label(),
             ReviewStatus::Good | ReviewStatus::Pass | ReviewStatus::Easy => Theme::success(),
         };"""
+)
+# Update the intentional UI contract test from legacy Pass/Fail to four FSRS grades.
+s = s.replace(
+    'fn instructions_show_answer_branch_includes_pass_and_fail() {',
+    'fn instructions_show_answer_branch_includes_four_fsrs_grades() {',
+)
+s = s.replace(
+    '        assert!(commands.contains("Pass"));\n        assert!(commands.contains("Fail"));',
+    '        assert!(commands.contains("Again"));\n        assert!(commands.contains("Hard"));\n        assert!(commands.contains("Good"));\n        assert!(commands.contains("Easy"));',
 )
 drill.write_text(s, encoding="utf-8")
 
