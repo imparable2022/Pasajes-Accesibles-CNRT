@@ -85,6 +85,13 @@ jobs:
         env:
           REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
         run: python ci/repeater/test_accessible.py
+      - name: Four ratings and personalized FSRS optimizer end-to-end
+        if: matrix.release
+        shell: pwsh
+        env:
+          REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
+        run: python ci/repeater/test_fsrs_four_ratings.py
+
       - name: CLI smoke test
         if: matrix.release
         shell: pwsh
