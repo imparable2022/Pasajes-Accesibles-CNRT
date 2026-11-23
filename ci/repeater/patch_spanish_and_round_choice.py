@@ -199,7 +199,7 @@ pairs = [
     ('show_again.push_str("<30 mins");', 'show_again.push_str("menos de 30 minutos");'),
     ('show_again.push_str("<12 hours");', 'show_again.push_str("menos de 12 horas");'),
     ('show_again.push_str("<1 day");', 'show_again.push_str("menos de un día");'),
-    ('format!("{} days", show_again_duration as i64)', 'format!("{} días", show_again_duration as i64)'),
+    ('format!("{} days", self.show_again_duration as i64)', 'format!("{} días", self.show_again_duration as i64)'),
     ('"{} coming again"', '"{} para repasar"'),
     ('Theme::key_chip("AI enhanced")', 'Theme::key_chip("Mejorada con IA")'),
     ('"Enhancing this card with AI...\\n\\nPlease wait."', '"Mejorando esta tarjeta con IA...\\n\\nEspera un momento."'),
