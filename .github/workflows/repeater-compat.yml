@@ -51,6 +51,8 @@ jobs:
         run: python ci/repeater/patch_accessible.py
       - name: Add four-grade FSRS history and optimizer
         run: python ci/repeater/patch_fsrs_anki_style.py
+      - name: Translate Repeater into Spanish and offer choice between study rounds
+        run: python ci/repeater/patch_spanish_and_round_choice.py
       - name: Set up Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -98,6 +100,13 @@ jobs:
         env:
           REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
         run: python ci/repeater/test_matematica_105.py
+
+      - name: Spanish prompts and optional repetition rounds
+        if: matrix.release
+        shell: pwsh
+        env:
+          REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
+        run: python ci/repeater/test_round_choice_spanish.py
 
       - name: CLI smoke test
         if: matrix.release
