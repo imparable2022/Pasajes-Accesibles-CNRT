@@ -16,7 +16,7 @@ deck.write_text(
 )
 env = dict(os.environ, REPEATER_DATA_DIR=str(root / "data"), NO_COLOR="1")
 cmd = [str(exe), "drill", "--accessible", str(deck)]
-proc = subprocess.run(cmd, input="\n\n", text=True, capture_output=True, env=env, timeout=30)
+proc = subprocess.run(cmd, input="\n\n", text=True, encoding="utf-8", errors="replace", capture_output=True, env=env, timeout=30)
 print("EXE:", exe)
 print("STDOUT:", proc.stdout)
 print("STDERR:", proc.stderr)
@@ -25,7 +25,7 @@ stdout = proc.stdout
 assert "first accessibility question" in stdout.lower()
 assert "first accessible answer" in stdout.lower()
 assert stdout.index("first accessibility question") < stdout.index("first accessible answer")
-assert "Review saved: Good." in stdout, "no persisted grade acknowledgement"
+assert "Repaso guardado: Bien." in stdout, "no persisted grade acknowledgement"
 dbpath = root / "data" / "cards.db"
 assert dbpath.is_file(), "missing SQLite database"
 with sqlite3.connect(dbpath) as db:
