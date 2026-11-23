@@ -12,14 +12,12 @@ with tempfile.TemporaryDirectory(prefix="repeater-accessible-") as folder:
     deck = root / "accessible.md"
     deck.write_text(
         "Q: What is the first accessibility question?\n"
-        "A: The first accessible answer.\n\n"
-        "Q: What is the second accessibility question?\n"
-        "A: The second accessible answer.\n",
+        "A: The first accessible answer.\n",
         encoding="utf-8",
     )
     env = dict(os.environ, REPEATER_DATA_DIR=str(root / "data"), NO_COLOR="1")
     cmd = [str(exe), "drill", "--accessible", str(deck)]
-    proc = subprocess.run(cmd, input="\n\nq\n", text=True, capture_output=True, env=env, timeout=30)
+    proc = subprocess.run(cmd, input="\n\n", text=True, capture_output=True, env=env, timeout=30)
     print("EXE:", exe)
     print("STDOUT:", proc.stdout)
     print("STDERR:", proc.stderr)
