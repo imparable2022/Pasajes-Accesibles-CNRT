@@ -44,9 +44,9 @@ def main():
         stdin = "\n4\n" * 105 + "q\n"
         output = call(["drill", "--accessible", "--card-limit", "105",
                        "--new-card-limit", "105", DECKS], env, stdin, timeout=300)
-        q_count = len(re.findall(r"Card \d+ of \d+\. Question:", output))
-        a_count = output.count("Answer:")
-        saved_count = output.count("Review saved:")
+        q_count = len(re.findall(r"Tarjeta \d+ de \d+\. Pregunta:", output))
+        a_count = output.count("Respuesta:")
+        saved_count = output.count("Repaso guardado:")
         dbpath = Path(env["REPEATER_DATA_DIR"]) / "cards.db"
         assert dbpath.exists(), dbpath
         with closing(sqlite3.connect(dbpath)) as con:
