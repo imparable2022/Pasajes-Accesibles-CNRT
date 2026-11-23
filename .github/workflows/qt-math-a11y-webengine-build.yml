@@ -158,6 +158,7 @@ jobs:
               "-DQT_BUILD_EXAMPLES=OFF",
               "-DQT_BUILD_TESTS=OFF",
               "-DQT_SHOW_EXTRA_IDE_SOURCES=OFF",
+              "-DCMAKE_BUILD_TYPE=Release",
               "-DFEATURE_qtpdf_build=OFF",
               "-DFEATURE_qtwebengine_widgets_build=OFF",
               "-DFEATURE_qtwebengine_quick_build=OFF",
@@ -206,6 +207,24 @@ jobs:
             $extensionsEntry = Select-String -Path CMakeCache.txt -Pattern "^FEATURE_webengine_extensions:BOOL=ON$"
             if (-not $extensionsEntry) { throw "Qt WebEngine extensions must remain enabled for a link-complete Windows runtime" }
 
+            $releaseEntry = Select-String -Path CMakeCache.txt -Pattern "^CMAKE_BUILD_TYPE:STRING=Release$"
+            if (-not $releaseEntry) { throw "Qt WebEngine must be configured as Release to avoid multi-gigabyte debug-symbol cache pressure" }
+
+            $gnArgs = @(Get-ChildItem . -Recurse -Filter args.gn -File -ErrorAction SilentlyContinue)
+            if (-not $gnArgs) { throw "Chromium args.gn was not generated" }
+            $releaseGnVerified = $false
+            foreach ($gn in $gnArgs) {
+              $gnText = Get-Content $gn.FullName -Raw
+              if ($gnText -match "(?m)^is_debug=false$" -and $gnText -match "(?m)^symbol_level=0$") {
+                Write-Host "Verified lean Chromium Release GN args: $($gn.FullName)"
+                $releaseGnVerified = $true
+                break
+              }
+            }
+            if (-not $releaseGnVerified) {
+              throw "Chromium was not configured with is_debug=false and symbol_level=0"
+            }
+
             $targets = ninja -t targets all
             if ($LASTEXITCODE -ne 0) { throw "Could not enumerate Ninja targets" }
             if (-not ($targets -match "(?m)^WebEngineCore:")) {
@@ -226,7 +245,7 @@ jobs:
           NINJAFLAGS: "-j4"
           QTWEBENGINE_GN_THREADS: "4"
         run: |
-          cmake --build web-build --config RelWithDebInfo --parallel 4 --target WebEngineCore
+          cmake --build web-build --config Release --parallel 4 --target WebEngineCore
           if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine Core build failed" }
           $dll = Get-ChildItem web-build -Recurse -Filter Qt6WebEngineCore.dll -File | Sort-Object FullName | Select-Object -First 1
           if (-not $dll) { throw "Patched Qt6WebEngineCore.dll was not produced" }
