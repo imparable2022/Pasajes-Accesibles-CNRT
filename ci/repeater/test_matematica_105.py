@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 import re
 import sqlite3
+from contextlib import closing
 import subprocess
 import tempfile
 
@@ -48,7 +49,7 @@ def main():
         saved_count = output.count("Review saved:")
         dbpath = Path(env["REPEATER_DATA_DIR"]) / "cards.db"
         assert dbpath.exists(), dbpath
-        with sqlite3.connect(dbpath) as con:
+        with closing(sqlite3.connect(dbpath)) as con:
             grades = con.execute("SELECT rating,COUNT(*) FROM review_log GROUP BY rating").fetchall()
             card_count = con.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
             state_count = con.execute("SELECT COUNT(*) FROM cards WHERE review_count >= 1").fetchone()[0]
