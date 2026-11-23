@@ -92,6 +92,13 @@ jobs:
           REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
         run: python ci/repeater/test_fsrs_four_ratings.py
 
+      - name: Study actual 105 mathematics cards on Windows and verify FSRS persistence
+        if: matrix.release
+        shell: pwsh
+        env:
+          REPEATER_TEST_EXE: ${{ github.workspace }}/repeater/target/release/repeater.exe
+        run: python ci/repeater/test_matematica_105.py
+
       - name: CLI smoke test
         if: matrix.release
         shell: pwsh
