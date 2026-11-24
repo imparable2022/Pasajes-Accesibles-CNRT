@@ -145,6 +145,25 @@ jobs:
             git diff --check
           } finally { Pop-Location }
 
+      - name: Force symbol-free Chromium RelWithDebInfo for CI proof
+        shell: pwsh
+        run: |
+          $helper = "qwe/cmake/QtToolchainHelpers.cmake"
+          $text = Get-Content $helper -Raw
+          $pattern = '(?ms)(elseif\(\$\{config\} STREQUAL "RelWithDebInfo"\)\s*list\(APPEND gnArgArg is_debug=false enable_mojom_message_id_scrambling=true\)\s*)if\(WIN32 AND NOT CLANG\)\s*list\(APPEND gnArgArg symbol_level=2\)\s*else\(\)\s*list\(APPEND gnArgArg symbol_level=1\)\s*endif\(\)'
+          $matches = [regex]::Matches($text, $pattern)
+          if ($matches.Count -ne 1) {
+            throw "Expected exactly one RelWithDebInfo Chromium symbol-level block, found $($matches.Count)"
+          }
+          $replacement = '$1list(APPEND gnArgArg symbol_level=0)'
+          $updated = [regex]::Replace($text, $pattern, $replacement)
+          [IO.File]::WriteAllText($helper, $updated, [Text.UTF8Encoding]::new($false))
+          $verify = Get-Content $helper -Raw
+          if ($verify -notmatch '(?ms)elseif\(\$\{config\} STREQUAL "RelWithDebInfo"\).*?symbol_level=0') {
+            throw "RelWithDebInfo Chromium symbol_level=0 override was not applied"
+          }
+          Write-Host "Qt WebEngine RelWithDebInfo will build Chromium with symbol_level=0."
+
       - name: Configure patched Qt WebEngine Core
         shell: pwsh
         env:
@@ -158,7 +177,6 @@ jobs:
               "-DQT_BUILD_EXAMPLES=OFF",
               "-DQT_BUILD_TESTS=OFF",
               "-DQT_SHOW_EXTRA_IDE_SOURCES=OFF",
-              "-DCMAKE_CONFIGURATION_TYPES=Release",
               "-DFEATURE_qtpdf_build=OFF",
               "-DFEATURE_qtwebengine_widgets_build=OFF",
               "-DFEATURE_qtwebengine_quick_build=OFF",
@@ -207,12 +225,12 @@ jobs:
             $extensionsEntry = Select-String -Path CMakeCache.txt -Pattern "^FEATURE_webengine_extensions:BOOL=ON$"
             if (-not $extensionsEntry) { throw "Qt WebEngine extensions must remain enabled for a link-complete Windows runtime" }
 
-            $releaseEntry = Select-String -Path CMakeCache.txt -Pattern "^CMAKE_CONFIGURATION_TYPES:[^=]+=Release$"
-            if (-not $releaseEntry) { throw "Qt WebEngine multi-config generator must expose Release only to avoid multi-gigabyte debug-symbol cache pressure" }
-            if (-not (Test-Path "build-Release.ninja")) { throw "Release Ninja graph was not generated" }
-            Write-Host "Verified CMAKE_CONFIGURATION_TYPES=Release and build-Release.ninja. Qt WebEngine 6.11.2 maps Release to Chromium is_debug=false and symbol_level=0."
+            $configs = Select-String -Path CMakeCache.txt -Pattern "^CMAKE_CONFIGURATION_TYPES:[^=]+=.*RelWithDebInfo.*$"
+            if (-not $configs) { throw "Official Qt SDK did not expose RelWithDebInfo" }
+            if (-not (Test-Path "build-RelWithDebInfo.ninja")) { throw "RelWithDebInfo Ninja graph was not generated" }
+            Write-Host "Verified official Qt RelWithDebInfo graph. Chromium symbols are forced to level 0 by the CI-only source override."
 
-            $targets = ninja -f build-Release.ninja -t targets all
+            $targets = ninja -f build-RelWithDebInfo.ninja -t targets all
             if ($LASTEXITCODE -ne 0) { throw "Could not enumerate Ninja targets" }
             if (-not ($targets -match "(?m)^WebEngineCore:")) {
               throw "WebEngineCore target was not generated"
@@ -232,7 +250,7 @@ jobs:
           NINJAFLAGS: "-j4"
           QTWEBENGINE_GN_THREADS: "4"
         run: |
-          cmake --build web-build --config Release --parallel 4 --target WebEngineCore
+          cmake --build web-build --config RelWithDebInfo --parallel 4 --target WebEngineCore
           if ($LASTEXITCODE -ne 0) { throw "Qt WebEngine Core build failed" }
           $dll = Get-ChildItem web-build -Recurse -Filter Qt6WebEngineCore.dll -File | Sort-Object FullName | Select-Object -First 1
           if (-not $dll) { throw "Patched Qt6WebEngineCore.dll was not produced" }
